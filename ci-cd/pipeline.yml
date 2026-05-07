@@ -43,7 +43,11 @@ jobs:
         run: |
           docker build -t $ECR_REPOSITORY:${{ github.sha }} .
 
-      # BUG 4: Image is pushed before tests run — moved below Run tests
+      - name: Run tests
+        run: |
+          # BUG 5: Wrong command — this project uses npm, not yarn
+          yarn test
+
       - name: Push image to ECR
         if: github.event_name == 'push'   # skip push on PRs
         run: |
@@ -51,11 +55,6 @@ jobs:
             ${{ steps.ecr-login.outputs.registry }}/$ECR_REPOSITORY:${{ github.sha }}
           docker push \
             ${{ steps.ecr-login.outputs.registry }}/$ECR_REPOSITORY:${{ github.sha }}
-
-      - name: Run tests
-        run: |
-          # BUG 5: Wrong command — this project uses npm, not yarn
-          yarn test
 
       # TODO (Task 3b): Add Trivy vulnerability scan here (fail on CRITICAL)
       # TODO (Task 3c): Add GitOps update step here (push to main only)
