@@ -6,8 +6,7 @@ metadata:
   labels:
     app: api-service
 spec:
-  # ISSUE 6: Should be ClusterIP — ingress is handled separately
-  type: LoadBalancer
+  type: ClusterIP   # ingress controller handles external traffic; no per-service cloud LB needed
   selector:
     app: api-service
   ports:
