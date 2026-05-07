@@ -177,3 +177,55 @@ resource "aws_iam_role_policy_attachment" "app_sa_s3" {
   policy_arn = aws_iam_policy.app_sa_s3.arn
 }
 
+# -----------------------------------------------------------------
+# Launch Template — tags EC2 instances with Environment at launch time
+# -----------------------------------------------------------------
+
+resource "aws_launch_template" "nodes" {
+  name_prefix = "${var.cluster_name}-nodes-"
+
+  tag_specifications {
+    resource_type = "instance"
+    tags = merge(var.tags, {
+      Name        = "${var.cluster_name}-node"
+      Environment = var.environment
+    })
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+# -----------------------------------------------------------------
+# Managed Node Group
+# -----------------------------------------------------------------
+
+resource "aws_eks_node_group" "main" {
+  cluster_name    = aws_eks_cluster.this.name
+  node_group_name = "${var.cluster_name}-main"
+  node_role_arn   = aws_iam_role.node_group.arn
+  subnet_ids      = var.node_group_subnet_ids
+
+  instance_types = ["t3.medium"]
+
+  scaling_config {
+    desired_size = 1
+    min_size     = 1
+    max_size     = 3
+  }
+
+  launch_template {
+    id      = aws_launch_template.nodes.id
+    version = "$Latest"
+  }
+
+  tags = var.tags
+
+  depends_on = [
+    aws_iam_role_policy_attachment.node_worker_policy,
+    aws_iam_role_policy_attachment.node_cni_policy,
+    aws_iam_role_policy_attachment.node_ecr_policy,
+  ]
+}
+
