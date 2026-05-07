@@ -32,9 +32,9 @@
 - [x] Task 2a — Fixed all 6 Kubernetes issues
 - [x] Task 2b — Created Kustomize staging overlay
 - [x] Task 2c — Wrote NetworkPolicy
-- [ ] Task 3a — Fixed pipeline bugs
-- [ ] Task 3b — Applied security improvements (OIDC, Trivy)
-- [ ] Task 3c — Added GitOps update step
+- [x] Task 3a — Fixed pipeline bugs
+- [x] Task 3b — Applied security improvements (OIDC, Trivy)
+- [x] Task 3c — Added GitOps update step
 - [ ] Task 4  — Wrote incident triage script
 - [ ] Task 5  — Wrote observability design document
 
@@ -121,6 +121,28 @@ aws dynamodb create-table --table-name acme-staging-tfstate-lock \
 
 
 ### Task 3 — CI/CD
+
+#### 3a — Bug Fixes
+
+**BUG 1 — Trigger on all push events** (`ci-cd/pipeline.yml`): `on: push` fires the workflow on every push to every branch and every pull_request event. Changed to `on: push: branches: [main]` plus `on: pull_request: branches: [main]`. This means the build and test steps run on PRs (giving feedback before merge) but the image push and GitOps update steps are gated on `github.event_name == 'push'` — they only fire on a completed merge to main. Pushing an untested image from a feature branch would be a meaningful production risk.
+
+**BUG 2 — Hardcoded long-lived AWS credentials** (`ci-cd/pipeline.yml`): `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` were set as env vars sourced from GitHub secrets. Long-lived IAM user credentials can be leaked via CI logs, forked PRs, or secret scanning gaps. Replaced with OIDC: added `permissions: id-token: write` at the workflow level (GitHub must issue an OIDC token to the runner) and a `configure-aws-credentials` step that calls `AssumeRoleWithWebIdentity` using the role ARN stored as `AWS_ROLE_ARN`. The IAM role's trust policy must be configured to accept the OIDC token from `token.actions.githubusercontent.com` — this is done once in the AWS account, not in the pipeline. The result is that no credentials are stored anywhere; the runner gets a temporary session token scoped to the job.
+
+**BUG 3 — Hardcoded AWS account ID** (`ci-cd/pipeline.yml`): `123456789012.dkr.ecr.$AWS_REGION.amazonaws.com` appeared in both the ECR login command and the push step. Replaced the manual `aws ecr get-login-password | docker login` command with the `amazon-ecr-login` action (`id: ecr-login`). This action resolves the registry URL automatically from the caller's identity and exposes it as `steps.ecr-login.outputs.registry`. All subsequent steps reference that output — the account ID never appears in the pipeline file.
+
+**BUG 4 — Image pushed before tests run** (`ci-cd/pipeline.yml`): The Push step appeared before Run tests, meaning a broken build could push a faulty image to ECR before any test failure was detected. Reordered steps: Build → Run tests → Trivy scan → Push → GitOps update. A failed test or scan now aborts the run before the image reaches the registry.
+
+**BUG 5 — Wrong package manager command** (`ci-cd/pipeline.yml`): `yarn test` was used but the project uses npm (the presence of `package-lock.json` vs `yarn.lock` is the canonical indicator). Changed to `npm test`. Running the wrong package manager silently installs nothing and the test command either fails with "command not found" or runs against stale dependencies.
+
+#### 3b — Security Improvements
+
+**OIDC auth**: Covered in BUG 2 above — no long-lived credentials anywhere in the pipeline.
+
+**Trivy scan before push**: Added `aquasecurity/trivy-action@0.30.0` between the test step and the push step. `exit-code: '1'` fails the pipeline if CRITICAL vulnerabilities are found. `ignore-unfixed: true` suppresses findings where no patched version exists yet — these can't be actioned immediately and create alert fatigue that leads teams to ignore the scanner entirely. The scan runs against the locally built image (before push), so a vulnerable image never reaches the registry.
+
+#### 3c — GitOps Update Step
+
+After a successful push to ECR, `kustomize edit set image` rewrites the image reference in `kubernetes/overlays/staging/kustomization.yaml` to point to the newly pushed tag. The step is gated on `github.event_name == 'push'` so it never runs on PRs. The `github-actions[bot]` identity is used for the commit and push, making automated commits distinguishable from human commits in git history. `permissions: contents: write` was added at the workflow level to allow the runner to push the kustomization change back to the repo. A GitOps controller (ArgoCD or Flux) watching the repo will detect this commit and sync the staging cluster to the new image tag.
 
 
 
