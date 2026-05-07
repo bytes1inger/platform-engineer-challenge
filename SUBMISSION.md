@@ -178,6 +178,26 @@ The design document (`docs/observability-design.md`) proposes a unified observab
 
 ---
 
+## Observations on the Current Architecture
+
+While working through the tasks, I noticed several things in `docs/architecture-brief.md` that would be risks in production beyond what the challenge covers. These are not criticisms — the brief is intentionally scoped — but they are what I would raise in my first week on the job.
+
+**Direct Connect is a single point of failure.** The brief describes one Direct Connect link between Nairobi and af-south-1. If that link goes down, the on-premise cluster loses all cloud connectivity — not just observability (Thanos, Fluent Bit) but potentially application traffic if services call across clusters. I would push for a site-to-site VPN as a failover path, even at reduced bandwidth. The observability design accounts for this partially (Fluent Bit disk buffering, Thanos local retention) but application-level failover is not addressed.
+
+**Spot instances for customer-facing APIs.** EKS runs 2 managed node groups (spot + on-demand) hosting customer-facing APIs and web applications. Spot instances can be reclaimed with 2 minutes notice. Without a PodDisruptionBudget, graceful shutdown handling, and a fallback to on-demand capacity, this creates intermittent availability drops that would be difficult to debug. The PDB added in Task 2 helps, but the deployment should also have `terminationGracePeriodSeconds` tuned and the spot node group should not be the sole home for latency-sensitive workloads.
+
+**kubeadm v1.29 with 2 engineers.** kubeadm control plane upgrades are manual, node-by-node, and must follow a strict minor-version sequence. With 3 control plane nodes and 12 workers, a version upgrade is a full day of work. v1.29 reaches end-of-life in early 2026 — this is already overdue. I would evaluate moving on-prem to k3s or RKE2 for simpler lifecycle management, or accept the operational cost and schedule quarterly upgrade windows.
+
+**No ingress controller documented.** In Task 2 I changed the Service type from LoadBalancer to ClusterIP, assuming ingress is handled by a dedicated controller. The brief does not mention what handles external traffic routing, TLS termination, or rate limiting. If no ingress controller exists, deploying one (e.g. ingress-nginx or AWS Load Balancer Controller on EKS) would be a prerequisite for the ClusterIP change to work in production.
+
+**No backup or disaster recovery strategy.** The on-premise kubeadm cluster stores etcd data on the control plane nodes. There is no mention of etcd snapshot schedule, off-site backup, or tested restore procedure. For ISO 27001, the auditor will ask about recovery point objectives (RPO) and recovery time objectives (RTO). EKS manages the control plane, but application-level state (PVs, databases hosted on-prem) also needs a backup strategy.
+
+**Multi-tenancy without admission control.** The 6-month roadmap includes multi-tenancy on the on-premise cluster using namespaces and NetworkPolicy. Namespaces provide logical isolation, and NetworkPolicy provides network isolation — but neither prevents a team from deploying a privileged container, mounting the host filesystem, or omitting resource limits. Admission control (Kyverno or OPA Gatekeeper) is necessary to enforce these boundaries. Without it, multi-tenancy is a convention, not a guarantee.
+
+**ISO 27001 gaps beyond the ELK finding.** The brief flags the no-TLS ELK stack, but other gaps are likely: kubeadm does not enable API server audit logging by default (it must be configured via `--audit-policy-file`), etcd is not encrypted at rest unless explicitly configured, and there is no mention of RBAC review or least-privilege enforcement on the on-premise cluster. These would all surface during a certification audit.
+
+---
+
 ## Assumptions
 
 - The EKS cluster uses a private API endpoint in production; I temporarily enabled public access restricted to my IP for kubectl validation during the challenge, then reverted.
