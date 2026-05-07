@@ -220,5 +220,14 @@ terraform destroy -var="app_bucket_suffix=app-data"
 
 ### Task 4
 ```bash
-# How to run the triage script
+# Run against any deployment
+./scripts/incident.sh -n <namespace> -d <deployment>
+
+# Example (default namespace)
+./scripts/incident.sh -n default -d api-service
+
+# Help
+./scripts/incident.sh -h
 ```
+
+Example output from a live run against `nginx-demo` on `acme-staging-eks` is committed to `scripts/logs/nginx-demo-triage-example.log`.
