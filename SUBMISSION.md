@@ -35,7 +35,7 @@
 - [x] Task 3a — Fixed pipeline bugs
 - [x] Task 3b — Applied security improvements (OIDC, Trivy)
 - [x] Task 3c — Added GitOps update step
-- [ ] Task 4  — Wrote incident triage script
+- [x] Task 4  — Wrote incident triage script
 - [ ] Task 5  — Wrote observability design document
 
 ---
@@ -152,7 +152,17 @@ After a successful push to ECR, `kustomize edit set image` rewrites the image re
 
 ### Task 4 — Scripting
 
+**`scripts/incident.sh`** accepts `-n <namespace>` and `-d <deployment>` flags via `getopts`, defaulting namespace to `default`. All output is tee'd to `/tmp/triage-<deployment>-<timestamp>.log` from the point of `exec > >(tee -a "$LOG_FILE") 2>&1` — this single redirect means every subsequent command, including those inside functions and subshells, writes to both stdout and the log file without wrapping each one individually.
 
+**Pre-flight checks** run before any triage section. The script verifies cluster connectivity (`kubectl cluster-info`), confirms the namespace exists, and checks RBAC permissions for every operation it needs (`get deployments`, `get pods`, `get events`, `get horizontalpodautoscalers`, `get pods/log`) using `kubectl auth can-i`. Failing fast with a specific permission error is more useful to an on-call engineer than a cryptic mid-report failure. `kubectl top` requires metrics-server and is treated as non-fatal — the script warns and continues rather than exiting. The deployment existence check comes after RBAC so the error message can include a list of available deployments in the namespace.
+
+**Label selector derivation** (Section 2) queries `deployment.spec.selector.matchLabels` via jsonpath rather than assuming a fixed `app=` label. This makes the script work for any deployment regardless of label convention.
+
+**Previous container logs** (Section 4): if a pod has a non-zero restart count, the script fetches the terminated container's logs with `--previous`. The current container may look healthy while the root cause is only visible in the crashed container's output — this is the single most common miss in manual triage.
+
+**HPA lookup** (Section 6) uses a jsonpath filter `?(@.spec.scaleTargetRef.name=='${DEPLOYMENT}')` to find the HPA by its target rather than by name, since HPA names don't always match deployment names.
+
+**Safety**: every kubectl command is read-only (`get`, `describe`, `logs`, `top`). No `delete`, `patch`, `apply`, or `exec` operations anywhere in the script.
 
 ### Task 5 — Architecture
 
