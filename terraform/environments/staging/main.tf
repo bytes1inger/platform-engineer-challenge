@@ -16,12 +16,12 @@ module "vpc" {
 
   public_subnet_tags = {
     "kubernetes.io/cluster/${local.cluster_name}" = "owned"
-    "kubernetes.io/role/elb"                      = 0
+    "kubernetes.io/role/elb"                      = "1" # must be string "1" for ALB/NLB subnet discovery
   }
 
   private_subnet_tags = {
     "kubernetes.io/cluster/${local.cluster_name}" = "owned"
-    "kubernetes.io/role/internal-elb"             = 0
+    "kubernetes.io/role/internal-elb"             = "1" # must be string "1" for internal load balancer discovery
   }
 
   tags = local.common_tags

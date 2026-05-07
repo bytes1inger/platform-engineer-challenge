@@ -52,6 +52,8 @@
 
 - **Wrong IAM policy on cluster role** (`modules/eks-cluster/main.tf`): `AmazonEKSWorkerNodePolicy` was attached to the EKS control plane role. That policy is for EC2 worker nodes. The cluster role needs `AmazonEKSClusterPolicy`, which grants the control plane permission to manage VPC resources, security groups, and ENIs. The cluster would provision but be non-functional without this.
 
+- **ELB subnet discovery tags set to integer instead of string** (`environments/staging/main.tf`): Both `kubernetes.io/role/elb` and `kubernetes.io/role/internal-elb` were set to `0` (integer). The AWS Load Balancer Controller and in-tree cloud provider both require these values to be the string `"1"`. With the wrong value, load balancer provisioning silently fails — no ALB or NLB gets created when a Service or Ingress is applied.
+
 
 ### Task 2 — Kubernetes
 
