@@ -19,24 +19,78 @@
 #     - Report saved to /tmp/triage-<deployment>-<timestamp>.log
 #
 # =============================================================================
-
 set -euo pipefail
 
-# TODO (Task 4): Implement this script
-#
-# Requirements:
-#   1. Parse -n and -d flags with getopts; default namespace to "default"
-#   2. Validate that the deployment exists; exit 1 with a clear error if not
-#   3. Output the following sections, separated by clear headers:
-#      a. Deployment status (desired vs ready replicas, rollout conditions)
-#      b. Pod states (name, status, restarts, node)
-#      c. Last 20 events for the deployment and its pods, sorted by time
-#      d. Last 50 log lines from each pod's primary container (with timestamps)
-#      e. Resource usage per pod (kubectl top pods)
-#      f. HPA status, if an HPA exists for this deployment
-#   4. Tee output to /tmp/triage-<deployment>-<timestamp>.log
-#   5. Do NOT perform any destructive kubectl operations
-#   6. The script must be safe to run against a production cluster
+# =============================================================================
+# Defaults
+# =============================================================================
+NAMESPACE="default"
+DEPLOYMENT=""
+TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 
-echo "TODO: implement incident.sh"
-exit 1
+# =============================================================================
+# Helper functions
+# =============================================================================
+
+usage() {
+  cat <<EOF
+Usage: $0 -n <namespace> -d <deployment>
+
+Flags:
+  -n  Kubernetes namespace (default: default)
+  -d  Deployment name (required)
+  -h  Show this help
+
+Example:
+  $0 -n payments -d api-service
+
+Output:
+  Triage report printed to stdout and saved to
+  /tmp/triage-<deployment>-<timestamp>.log
+EOF
+  exit 0
+}
+
+# Print a clearly visible section header for readability in both
+# stdout and the log file
+section() {
+  echo ""
+  echo "============================================================"
+  echo "  $1"
+  echo "  $(date '+%Y-%m-%d %H:%M:%S')"
+  echo "============================================================"
+}
+
+# =============================================================================
+# Argument parsing
+# =============================================================================
+while getopts ":n:d:h" opt; do
+  case $opt in
+    n) NAMESPACE="$OPTARG" ;;
+    d) DEPLOYMENT="$OPTARG" ;;
+    h) usage ;;
+    :)
+      echo "ERROR: flag -${OPTARG} requires an argument" >&2
+      exit 1
+      ;;
+    \?)
+      echo "ERROR: unknown flag -${OPTARG}" >&2
+      exit 1
+      ;;
+  esac
+done
+
+if [[ -z "$DEPLOYMENT" ]]; then
+  echo "ERROR: -d <deployment> is required" >&2
+  echo "Run with -h for usage" >&2
+  exit 1
+fi
+
+LOG_FILE="/tmp/triage-${DEPLOYMENT}-${TIMESTAMP}.log"
+
+# Tee all output to log file from this point forward
+exec > >(tee -a "$LOG_FILE") 2>&1
+
+echo "Triage report: $LOG_FILE"
+echo "Started: $(date)"
+echo "Target: namespace=${NAMESPACE}, deployment=${DEPLOYMENT}"
