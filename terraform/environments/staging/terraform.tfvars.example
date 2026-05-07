@@ -1,8 +1,12 @@
 # Copy to terraform.tfvars and fill in real values before running terraform plan/apply
+# The ECR repository and app S3 bucket are created by Terraform — no pre-existing resources needed.
 
-aws_region   = "af-south-1"
-project      = "acme"
-environment  = "staging"
+aws_region  = "af-south-1"
+project     = "acme"
+environment = "staging"
 
-# Name of the pre-existing S3 bucket the app-sa service account needs to read from
-app_bucket_name = "acme-staging-app-data"
+# ECR repository name — overrides the default "acme/api-service" if needed
+# ecr_repository_name = "acme/api-service"
+
+# S3 bucket name will be: <project>-<environment>-<suffix> e.g. acme-staging-app-data
+# app_bucket_suffix = "app-data"

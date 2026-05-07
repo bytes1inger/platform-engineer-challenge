@@ -27,6 +27,50 @@ module "vpc" {
   tags = local.common_tags
 }
 
+# -----------------------------------------------------------------
+# ECR — container image registry for the CI/CD pipeline
+# -----------------------------------------------------------------
+
+resource "aws_ecr_repository" "api_service" {
+  name                 = var.ecr_repository_name
+  image_tag_mutability = "IMMUTABLE" # commit-sha tags are unique; prevent overwrites
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+
+  tags = local.common_tags
+}
+
+# -----------------------------------------------------------------
+# S3 — application data bucket (referenced by the IRSA policy)
+# -----------------------------------------------------------------
+
+resource "aws_s3_bucket" "app_data" {
+  bucket = "${var.project}-${var.environment}-${var.app_bucket_suffix}"
+  tags   = local.common_tags
+}
+
+resource "aws_s3_bucket_versioning" "app_data" {
+  bucket = aws_s3_bucket.app_data.id
+  versioning_configuration { status = "Enabled" }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "app_data" {
+  bucket = aws_s3_bucket.app_data.id
+  rule {
+    apply_server_side_encryption_by_default { sse_algorithm = "AES256" }
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "app_data" {
+  bucket                  = aws_s3_bucket.app_data.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
 module "eks" {
   source = "../../modules/eks-cluster"
 
@@ -37,7 +81,7 @@ module "eks" {
   subnet_ids      = module.vpc.private_subnets # control plane ENIs must be in private subnets
 
   node_group_subnet_ids = module.vpc.private_subnets
-  app_bucket_name       = var.app_bucket_name
+  app_bucket_name       = aws_s3_bucket.app_data.bucket
 
   tags = local.common_tags
 }

@@ -40,7 +40,14 @@ variable "cluster_version" {
   default     = "1.30"
 }
 
-variable "app_bucket_name" {
-  description = "Name of the S3 bucket the application service account needs access to"
+variable "ecr_repository_name" {
+  description = "ECR repository name for the application image"
   type        = string
+  default     = "acme/api-service"
+}
+
+variable "app_bucket_suffix" {
+  description = "Suffix appended to the project+environment prefix for the app data S3 bucket"
+  type        = string
+  default     = "app-data"
 }
