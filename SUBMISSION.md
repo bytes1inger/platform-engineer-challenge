@@ -144,6 +144,10 @@ aws dynamodb create-table --table-name acme-staging-tfstate-lock \
 
 After a successful push to ECR, `kustomize edit set image` rewrites the image reference in `kubernetes/overlays/staging/kustomization.yaml` to point to the newly pushed tag. The step is gated on `github.event_name == 'push'` so it never runs on PRs. The `github-actions[bot]` identity is used for the commit and push, making automated commits distinguishable from human commits in git history. `permissions: contents: write` was added at the workflow level to allow the runner to push the kustomization change back to the repo. A GitOps controller (ArgoCD or Flux) watching the repo will detect this commit and sync the staging cluster to the new image tag.
 
+**`[skip ci]` on the GitOps commit**: Without this, the commit pushed by the GitOps step would immediately re-trigger the workflow — the runner pushes to main, the push event fires, the workflow runs, builds and tests the same SHA, pushes the same image, commits the same kustomization change, and loops indefinitely. Adding `[skip ci]` to the commit message is the standard GitHub Actions mechanism to suppress workflow triggers on automation commits.
+
+**`IMAGE_URI` shared via `$GITHUB_ENV`**: A `Set IMAGE_URI` step runs immediately after ECR login and writes the full image reference (`registry/repo:sha`) to `$GITHUB_ENV`. Every downstream step — build, scan, push, and GitOps update — references `$IMAGE_URI` rather than reconstructing the URI independently. Without this, a tag formula change in one step silently diverges from the others; in the worst case the Trivy scan passes on one image tag while a different tag is pushed to ECR.
+
 
 
 ### Task 4 — Scripting
