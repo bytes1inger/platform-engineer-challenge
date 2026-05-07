@@ -2,7 +2,7 @@
 
 **Candidate name:** Gideon Warui
 **Date submitted:** 7 May 2026
-**Time spent (approximate):** ~4 hours
+**Time spent (approximate):** ~4 hours implementation + ~2 hours review and polish
 
 ---
 
