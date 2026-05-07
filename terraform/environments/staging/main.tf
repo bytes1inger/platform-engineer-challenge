@@ -34,9 +34,9 @@ module "eks" {
   cluster_version = var.cluster_version
   environment     = var.environment
   vpc_id          = module.vpc.vpc_id
-  subnet_ids      = module.vpc.public_subnets
+  subnet_ids      = module.vpc.private_subnets # control plane ENIs must be in private subnets
 
-  node_group_subnet_ids = module.vpc.private_subnets
+  node_group_subnet_ids = module.vpc.private_subnets 
 
   tags = local.common_tags
 }
