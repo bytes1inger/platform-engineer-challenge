@@ -224,3 +224,69 @@ AGE:.metadata.creationTimestamp"
 echo ""
 echo "--- Pod describe (all matching pods) ---"
 kubectl describe pods -n "$NAMESPACE" -l "$SELECTOR"
+
+# =============================================================================
+# Section 3 — Recent events
+# Events surface scheduling failures, image pull errors, OOMKills — sorted
+# by last seen time so the most recent problem is at the bottom.
+# =============================================================================
+section "3. RECENT EVENTS (last 20, sorted by time)"
+
+kubectl get events -n "$NAMESPACE" \
+  --field-selector "involvedObject.name=${DEPLOYMENT}" \
+  --sort-by='.lastTimestamp' \
+  | tail -20
+
+echo ""
+echo "--- Events for pods in this deployment ---"
+
+# Capture pod names into an array — reused across sections 3, 4, 5
+mapfile -t POD_NAMES < <(kubectl get pods -n "$NAMESPACE" -l "$SELECTOR" \
+  -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}')
+
+for pod in "${POD_NAMES[@]}"; do
+  echo ""
+  echo "Events for pod: ${pod}"
+  kubectl get events -n "$NAMESPACE" \
+    --field-selector "involvedObject.name=${pod}" \
+    --sort-by='.lastTimestamp' \
+    | tail -10
+done
+
+# =============================================================================
+# Section 4 — Recent logs
+# Last 50 lines with timestamps from each pod's primary container.
+# Timestamps are critical for correlating with external events or deploys.
+# =============================================================================
+section "4. RECENT LOGS (last 50 lines per pod, with timestamps)"
+
+for pod in "${POD_NAMES[@]}"; do
+  echo ""
+  echo "--- Logs: ${pod} ---"
+
+  CONTAINER=$(kubectl get pod "$pod" -n "$NAMESPACE" \
+    -o jsonpath='{.spec.containers[0].name}')
+  echo "Container: ${CONTAINER}"
+  echo ""
+
+  kubectl logs "$pod" -n "$NAMESPACE" \
+    --container="$CONTAINER" \
+    --tail=50 \
+    --timestamps=true 2>&1 || echo "  (could not retrieve logs for ${pod})"
+
+  # Fetch previous container logs if the pod has restarted — the current
+  # container may look healthy while the crash that caused the restart is
+  # only visible in the terminated container's logs
+  RESTART_COUNT=$(kubectl get pod "$pod" -n "$NAMESPACE" \
+    -o jsonpath='{.status.containerStatuses[0].restartCount}' 2>/dev/null || echo "0")
+
+  if [[ "$RESTART_COUNT" -gt 0 ]]; then
+    echo ""
+    echo "  ⚠ Pod has restarted ${RESTART_COUNT} time(s) — previous container logs:"
+    kubectl logs "$pod" -n "$NAMESPACE" \
+      --container="$CONTAINER" \
+      --previous \
+      --tail=50 \
+      --timestamps=true 2>&1 || echo "  (previous logs not available)"
+  fi
+done
