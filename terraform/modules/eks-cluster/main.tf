@@ -14,7 +14,7 @@ resource "aws_eks_cluster" "this" {
   vpc_config {
     subnet_ids              = var.subnet_ids
     endpoint_private_access = true
-    endpoint_public_access  = true
+    endpoint_public_access  = false # API server accessible from within the VPC only
 
     security_group_ids = [aws_security_group.cluster.id]
   }
@@ -52,7 +52,7 @@ resource "aws_iam_role" "cluster" {
 resource "aws_iam_role_policy_attachment" "cluster_policy" {
   role = aws_iam_role.cluster.name
   # AmazonEKSClusterPolicy grants the control plane permissions to manage VPC resources,
-  # security groups, and ENIs on your behalf — without it the cluster cannot function.
+  # security groups, and ENIs on your behalf; without it the cluster cannot function.
   # AmazonEKSWorkerNodePolicy is for EC2 worker nodes, not the control plane.
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
 }

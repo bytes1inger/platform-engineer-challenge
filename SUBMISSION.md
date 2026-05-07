@@ -48,6 +48,8 @@
 
 **Bug fixes applied:**
 
+- **Public API endpoint enabled** (`modules/eks-cluster/main.tf`): `endpoint_public_access` was `true`, exposing the Kubernetes API server to the internet. Set to `false` so API access is restricted to within the VPC; required for any production or staging cluster. Engineers use kubectl via VPN or a bastion; this is the expected trade-off.
+
 - **Wrong IAM policy on cluster role** (`modules/eks-cluster/main.tf`): `AmazonEKSWorkerNodePolicy` was attached to the EKS control plane role. That policy is for EC2 worker nodes. The cluster role needs `AmazonEKSClusterPolicy`, which grants the control plane permission to manage VPC resources, security groups, and ENIs. The cluster would provision but be non-functional without this.
 
 
