@@ -290,3 +290,53 @@ for pod in "${POD_NAMES[@]}"; do
       --timestamps=true 2>&1 || echo "  (previous logs not available)"
   fi
 done
+
+# =============================================================================
+# Section 5 — Resource usage
+# CPU and memory actuals vs requests/limits. OOMKill and CPU throttling
+# are invisible without this. kubectl top requires metrics-server.
+# =============================================================================
+section "5. RESOURCE USAGE (kubectl top)"
+
+if kubectl top pods -n "$NAMESPACE" -l "$SELECTOR" --containers 2>/dev/null; then
+  : # success
+else
+  echo "WARNING: kubectl top unavailable — metrics-server may not be installed"
+fi
+
+# =============================================================================
+# Section 6 — HPA status
+# If an HPA exists, its current vs desired replica count and metric values
+# explain scaling behaviour — missing replicas often trace back here.
+# =============================================================================
+section "6. HPA STATUS"
+
+if kubectl get hpa -n "$NAMESPACE" 2>/dev/null | grep -q "$DEPLOYMENT"; then
+  echo "HPA found for deployment: ${DEPLOYMENT}"
+  echo ""
+  kubectl get hpa -n "$NAMESPACE" -o wide | grep -E "NAME|${DEPLOYMENT}"
+
+  echo ""
+  echo "--- HPA description ---"
+  HPA_NAME=$(kubectl get hpa -n "$NAMESPACE" \
+    -o jsonpath="{range .items[?(@.spec.scaleTargetRef.name=='${DEPLOYMENT}')]}{.metadata.name}{end}")
+
+  if [[ -n "$HPA_NAME" ]]; then
+    kubectl describe hpa "$HPA_NAME" -n "$NAMESPACE"
+  fi
+else
+  echo "No HPA found for deployment '${DEPLOYMENT}' in namespace '${NAMESPACE}'"
+fi
+
+# =============================================================================
+# Summary footer
+# =============================================================================
+section "TRIAGE COMPLETE"
+echo "Report saved to: ${LOG_FILE}"
+echo "Finished: $(date)"
+echo ""
+echo "Next steps if issue not resolved:"
+echo "  1. Check node conditions:  kubectl get nodes"
+echo "  2. Check PV/PVC status:    kubectl get pvc -n ${NAMESPACE}"
+echo "  3. Check network policies: kubectl get networkpolicy -n ${NAMESPACE}"
+echo "  4. Check RBAC:             kubectl auth can-i --list --as=system:serviceaccount:${NAMESPACE}:default"
