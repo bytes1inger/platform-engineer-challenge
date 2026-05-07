@@ -45,14 +45,14 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp               # Node.js runtime needs a writable /tmp
-          resources:
+          resources:                       # prevent unbounded resource consumption and enable scheduler placement
             requests:
               cpu: "100m"
               memory: "128Mi"
             limits:
               cpu: "500m"
               memory: "256Mi"
-          livenessProbe:
+          livenessProbe:                    # restart hung containers; readinessProbe gates traffic until healthy
             httpGet:
               path: /health
               port: 3000
