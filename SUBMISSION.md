@@ -26,8 +26,8 @@
 
 <!-- Check off what you completed -->
 
-- [ ] Task 1a — Fixed Terraform bugs
-- [ ] Task 1b — Extended EKS module (IRSA + node group)
+- [x] Task 1a — Fixed Terraform bugs
+- [x] Task 1b — Extended EKS module (IRSA + node group)
 - [ ] Task 1c — Added remote state backend config
 - [ ] Task 2a — Fixed all 6 Kubernetes issues
 - [ ] Task 2b — Created Kustomize staging overlay
@@ -63,6 +63,10 @@ Bugs fixed:
 **IRSA role for `app-sa`** (`modules/eks-cluster/main.tf`): An IAM role with a web identity trust policy is added, scoped to a single Kubernetes service account (`system:serviceaccount:default:app-sa`) using the cluster's OIDC issuer as the federated principal. The trust policy includes both the `:sub` condition (restricts to the specific service account) and the `:aud` condition (restricts to the STS endpoint) — both are required; omitting `:aud` makes the role assumable by any workload that gets an OIDC token from this cluster. An inline S3 policy grants only `s3:GetObject` and `s3:ListBucket` on the specific bucket, following least-privilege. The role ARN is exposed as a module output so it can be placed in a Kubernetes ServiceAccount annotation by whatever CD tool manages the cluster.
 
 **Managed node group** (`modules/eks-cluster/main.tf`): A launch template is added to attach an `Environment` tag to each EC2 instance at provision time — this is necessary because `aws_eks_node_group` tags only the node group object in the EKS API, not the underlying EC2 instances. The node group itself uses `t3.medium` instances in the private subnets, with `min=1`, `max=3`, and `desired=1`. The `depends_on` block ensures all three IAM policy attachments complete before the node group is created; without this, nodes can start bootstrapping before the CNI policy is in place and fail to join.
+
+**Module hardening beyond the task requirements:** Several implicit defaults were made explicit to ensure the module behaves predictably across environments. `ami_type = "AL2_x86_64"` and `capacity_type = "ON_DEMAND"` are now declared on the node group — without these, the AWS provider silently picks defaults that may differ across provider versions. `update_config { max_unavailable = 1 }` controls rolling node replacement so at most one node is drained at a time during a version upgrade. All five EKS control plane log types are enabled (`api`, `audit`, `authenticator`, `controllerManager`, `scheduler`) — the original config omitted `controllerManager` and `scheduler`, which are needed to debug scheduling failures and controller reconciliation issues. A lifecycle `precondition` on the S3 policy guards against an empty `app_bucket_name` producing a malformed `arn:aws:s3:::` ARN that would silently apply but grant nothing.
+
+**ECR repository and app S3 bucket** (`environments/staging/main.tf`): The CI/CD pipeline (Task 3) pushes to ECR and the application reads from S3 via IRSA. Rather than assuming these exist outside of Terraform, both are provisioned here so a single `terraform apply` creates the complete stack with no manual pre-steps. The ECR repository uses `IMMUTABLE` tags — the pipeline tags images with `github.sha`, which is unique per commit, so immutability prevents accidental overwrites of previously deployed images. `scan_on_push = true` enables AWS basic vulnerability scanning at no cost. The S3 bucket has versioning enabled, SSE-S3 default encryption, and all public access blocked. Both resource names are variable-driven (`var.ecr_repository_name`, `var.project`, `var.environment`, `var.app_bucket_suffix`) — no hardcoded strings.
 
 #### 1c — Remote State Backend
 
