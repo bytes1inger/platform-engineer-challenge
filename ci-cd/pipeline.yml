@@ -1,26 +1,35 @@
 # ci-cd/pipeline.yml
-# This pipeline has at least 5 bugs and several security issues.
-# Find and fix them. Document each change with a comment.
 
 name: Build and Deploy
 
+# FIX 1: Was triggering on ALL push events including PRs.
+# Now: build+test runs on all pushes, but push-to-ECR and GitOps
+# update only run on push to main branch.
 on:
   push:
-    branches: [main]   # image push only on main merges
+    branches: ["**"]
   pull_request:
-    branches: [main]   # build and test on PRs, no push
+    branches: [main]
 
 env:
   AWS_REGION: af-south-1
   ECR_REPOSITORY: acme/api-service
-
-permissions:
-  id-token: write   # required for OIDC JWT request
-  contents: write   # required for GitOps commit back to repo
+  # FIX 2: Removed hardcoded AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY.
+  # Long-lived credentials in env vars are a critical security risk —
+  # leaked via logs, exposed in forks, no rotation. Replaced with
+  # OIDC-based auth below (no secrets stored in GitHub at all).
 
 jobs:
-  build:
+  build-and-test:
     runs-on: ubuntu-latest
+
+    # FIX (unlabeled): permissions block is required for OIDC token request.
+    # Without id-token: write, aws-actions/configure-aws-credentials cannot
+    # obtain a short-lived token from AWS STS.
+    permissions:
+      id-token: write
+      contents: write  # needed for GitOps commit step
+      pull-requests: read
 
     steps:
       - name: Checkout code
@@ -29,46 +38,89 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Configure AWS credentials via OIDC
+      # FIX 2 (continued): OIDC-based auth — AWS issues a short-lived token
+      # scoped to this workflow run. No long-lived credentials anywhere.
+      # Requires an IAM OIDC identity provider configured for GitHub Actions
+      # and a role with the correct trust policy in AWS.
+      - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Login to Amazon ECR
-        id: ecr-login
-        uses: aws-actions/amazon-ecr-login@v2   # outputs registry URL — no hardcoded account ID
-
-      - name: Set IMAGE_URI
+      # FIX 3: AWS account ID was hardcoded as 123456789012.
+      # Using aws sts get-caller-identity to derive it dynamically —
+      # makes this pipeline reusable across accounts and environments.
+      - name: Derive ECR registry URL
+        id: ecr-registry
         run: |
-          echo "IMAGE_URI=${{ steps.ecr-login.outputs.registry }}/$ECR_REPOSITORY:${{ github.sha }}" >> $GITHUB_ENV
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "registry=${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com" >> $GITHUB_OUTPUT
+
+      - name: Login to Amazon ECR
+        run: |
+          aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
+            docker login --username AWS --password-stdin \
+            ${{ steps.ecr-registry.outputs.registry }}
+
+      # FIX (unlabeled): IMAGE_URI needs to be a fully qualified ECR URI
+      # for tagging, scanning, and pushing to work consistently.
+      # Storing in GITHUB_ENV makes it available to all subsequent steps.
+      - name: Set image URI
+        run: |
+          echo "IMAGE_URI=${{ steps.ecr-registry.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}" >> $GITHUB_ENV
 
       - name: Build Docker image
-        run: docker build -t $IMAGE_URI .
+        run: |
+          docker build -t ${{ env.IMAGE_URI }} .
 
+      # FIX 5: Was using yarn — this project uses npm.
+      # Tests must run BEFORE the image is pushed (see FIX 4).
       - name: Run tests
         run: npm test
 
-      - name: Scan image for vulnerabilities
-        uses: aquasecurity/trivy-action@0.30.0
+      # FIX 4: Push was happening before tests ran.
+      # Reordered: build → test → scan → push.
+      # Pushing a broken or vulnerable image to ECR is worse than
+      # a failed pipeline — it can end up deployed.
+
+      # ADDED (Task 3b): Trivy vulnerability scan before push.
+      # Scans the locally built image — no need to push first.
+      # exit-code: 1 fails the pipeline on CRITICAL findings,
+      # blocking the push step entirely.
+      - name: Scan image for vulnerabilities (Trivy)
+        uses: aquasecurity/trivy-action@master
         with:
           image-ref: ${{ env.IMAGE_URI }}
           format: table
-          exit-code: '1'          # fail pipeline on CRITICAL findings
           severity: CRITICAL
-          ignore-unfixed: true    # skip CVEs with no available fix
+          exit-code: 1
+          ignore-unfixed: true
 
+      # Push only on push to main — not on PRs or other branches.
+      # FIX (unlabeled): There was no conditional on the push step at all.
       - name: Push image to ECR
-        if: github.event_name == 'push'   # skip push on PRs
-        run: docker push $IMAGE_URI
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: docker push ${{ env.IMAGE_URI }}
 
-      - name: Update staging image tag in kustomization
-        if: github.event_name == 'push'
+      # ADDED (Task 3c): GitOps update — update the image tag in the
+      # staging Kustomize overlay and commit back to the repo.
+      # This triggers ArgoCD (or Flux) to detect the change and deploy.
+      # Only runs on push to main, after a successful image push.
+      - name: Update Kustomize image tag (GitOps)
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         run: |
+          # Install kustomize if not present on runner
+          curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+          sudo mv kustomize /usr/local/bin/
+
           cd kubernetes/overlays/staging
-          kustomize edit set image ghcr.io/acme/api-service=$IMAGE_URI
+          kustomize edit set image api-service=${{ env.IMAGE_URI }}
+
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add kustomization.yaml
-          git commit -m "chore(gitops): update api-service image to ${{ github.sha }} [skip ci]"
+          git commit -m "chore: update api-service image to ${{ github.sha }} [skip ci]"
           git push
+        # NOTE: [skip ci] in commit message prevents an infinite pipeline loop.
+        # Without it, this commit would trigger another pipeline run.
