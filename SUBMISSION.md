@@ -1,8 +1,8 @@
 # Submission — Platform Engineer (DevOps) Challenge
 
 **Candidate name:** Gideon Warui
-**Date submitted:**
-**Time spent (approximate):**
+**Date submitted:** 7 May 2026
+**Time spent (approximate):** ~12 hours
 
 ---
 
@@ -36,7 +36,7 @@
 - [x] Task 3b — Applied security improvements (OIDC, Trivy)
 - [x] Task 3c — Added GitOps update step
 - [x] Task 4  — Wrote incident triage script
-- [ ] Task 5  — Wrote observability design document
+- [x] Task 5  — Wrote observability design document
 
 ---
 
@@ -166,23 +166,35 @@ After a successful push to ECR, `kustomize edit set image` rewrites the image re
 
 ### Task 5 — Architecture
 
+The design document (`docs/observability-design.md`) proposes a unified observability stack across the on-premise kubeadm cluster and EKS in af-south-1, built around three pillars: Prometheus + Thanos for metrics, Fluent Bit + OpenSearch for logging, and Alertmanager + PagerDuty for alerting.
 
+**Metrics — Prometheus + Thanos over AMP:** Amazon Managed Prometheus became available in af-south-1 in June 2025, but at $0.90/10M samples ingested, ~50,000 active series across both clusters would cost ~$260/month for ingestion alone — a third of the $800 budget before logging. Thanos sidecars on existing Prometheus instances ship 2-hour TSDB blocks to S3, achieving the same cross-cluster federation at ~$50/month. Block shipping (not remote write) was chosen because it handles Direct Connect connectivity drops gracefully — Prometheus retains data locally and replays the backlog when the link recovers. Grafana Mimir and VictoriaMetrics were also evaluated and rejected (Mimir requires replacing Prometheus entirely; VM cluster is open-core with enterprise-only federation features).
+
+**Logging — Fluent Bit + OpenSearch over self-hosted ELK:** The current Fluentd-to-ELK stack has no TLS, which is an ISO 27001 finding. Fluent Bit replaces Fluentd at 4-6x lower resource usage (AWS benchmarks), ships over TLS to managed OpenSearch in af-south-1 (satisfying data residency), and buffers to local disk during connectivity drops. OpenSearch was chosen as a managed service because self-hosting Elasticsearch requires JVM tuning and index lifecycle management that two engineers cannot sustain. ISM `cold_migration` handles the 30-day hot to archive transition, with S3 lifecycle moving objects to Glacier at 90 days.
+
+**Alerting — SLO burn rates from the Google SRE Workbook:** Rather than threshold-based alerts that generate noise, the design uses multiwindow burn rate alerting against a 99.9% / 30-day SLO (43.8 minutes error budget). Only 4 alerts are defined in the first 30 days — API error burn rate, node not ready, PV > 85% full, and certificate expiry < 14 days. Every alert requires a runbook; alerts without runbooks are disabled. This prevents alert sprawl on a two-person team.
+
+**Trade-offs:** The decision framework is explicit: self-host any component where the managed equivalent consumes over 40% of the budget for a single concern. Total estimated spend is ~$430/month, retaining $370 headroom for the eu-west-1 OpenSearch domain planned in 6 months.
 
 ---
 
 ## Assumptions
 
--
--
--
+- The EKS cluster uses a private API endpoint in production; I temporarily enabled public access restricted to my IP for kubectl validation during the challenge, then reverted.
+- The `SECRET_KEY` value in `kubernetes/base/secret.yaml` is a placeholder. In production this would be injected by External Secrets Operator pulling from AWS Secrets Manager — the real value never exists in the repository.
+- The CI/CD pipeline assumes a GitHub OIDC trust relationship is already configured in the AWS account with a role whose ARN is stored as `AWS_ROLE_ARN` in GitHub Secrets.
+- The on-premise cluster has outbound connectivity to AWS af-south-1 over Direct Connect for the observability stack (Thanos block shipping, Fluent Bit log delivery).
+- `terraform.tfvars` is gitignored. A `terraform.tfvars.example` is committed to document the expected variables without exposing real values.
 
 ---
 
 ## What I Would Do With More Time
 
--
--
--
+- **Terraform:** Add a VPN/bastion module so the EKS private endpoint is accessible without temporarily enabling public access. Add an `aws_eks_addon` resource for the VPC CNI, CoreDNS, and kube-proxy so add-on lifecycle is managed by Terraform, not manual kubectl.
+- **Kubernetes:** Deploy External Secrets Operator with a SecretStore pointing to AWS Secrets Manager, replacing the placeholder Secret. Add Horizontal Pod Autoscaler manifest for `api-service` with CPU-based scaling.
+- **CI/CD:** Add a separate `test` job that runs in parallel with the build, caching `node_modules` across jobs. Add Slack notification on pipeline failure. Add SBOM generation (Syft) alongside the Trivy scan.
+- **Scripting:** Add a `--format json` flag to `incident.sh` for machine-readable output that could feed into a Slack webhook or incident management system. Add a `--since` flag to scope log and event collection to a time window.
+- **Observability:** Write Terraform for the OpenSearch domain and S3 buckets referenced in the design document. Prototype the kube-prometheus-stack + Thanos deployment with Helm values committed to the repo.
 
 ---
 
@@ -210,12 +222,46 @@ terraform destroy -var="app_bucket_suffix=app-data"
 
 ### Task 2
 ```bash
-# Commands to validate Kubernetes manifests
+# Validate base manifests
+kubectl apply --dry-run=client -f kubernetes/base/
+
+# Build and validate staging overlay
+kubectl kustomize kubernetes/overlays/staging/ | kubectl apply --dry-run=client -f -
+
+# Apply to a live cluster (requires kubeconfig)
+kubectl apply -k kubernetes/overlays/staging/
+
+# Verify NetworkPolicy
+kubectl get networkpolicy -n default
+kubectl describe networkpolicy api-service-netpol -n default
+
+# Verify PDB
+kubectl get pdb -n default
+
+# Verify security context (should show runAsNonRoot, no root containers)
+kubectl get deployment api-service -o jsonpath='{.spec.template.spec.securityContext}'
 ```
 
 ### Task 3
-```
-# How to test the pipeline (e.g., which branch to push to)
+```bash
+# The pipeline is at ci-cd/pipeline.yml (GitHub Actions workflow).
+# To test:
+
+# 1. Build + test runs on ANY branch push:
+git push origin solution/gideon-warui
+# → Triggers build, test, Trivy scan. Push to ECR is skipped (not main).
+
+# 2. Full pipeline (build + test + scan + push + GitOps) runs on push to main:
+git checkout main && git merge solution/gideon-warui && git push origin main
+# → Triggers full pipeline including ECR push and kustomize image tag update.
+
+# 3. PR to main triggers build + test only (no push):
+gh pr create --base main --head solution/gideon-warui
+
+# Prerequisites:
+# - AWS_ROLE_ARN secret configured in GitHub repo settings
+# - OIDC trust relationship configured in AWS IAM for GitHub Actions
+# - ECR repository acme/api-service exists in af-south-1
 ```
 
 ### Task 4
