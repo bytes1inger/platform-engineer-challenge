@@ -243,25 +243,49 @@ kubectl get deployment api-service -o jsonpath='{.spec.template.spec.securityCon
 ```
 
 ### Task 3
+
+**What was validated locally (21 automated checks, all passed):**
+
+1. YAML syntax parses correctly
+2. Trigger configuration: `push` on all branches + `pull_request` on main
+3. `permissions: id-token: write` present (required for OIDC)
+4. `permissions: contents: write` present (required for GitOps push)
+5. Step ordering: build → test → scan → push → GitOps update
+6. Push and GitOps steps gated on `github.ref == 'refs/heads/main' && github.event_name == 'push'`
+7. `[skip ci]` in GitOps commit message (prevents infinite workflow loop)
+8. Trivy pinned to `aquasecurity/trivy-action@0.30.0`, `exit-code: 1`, `severity: CRITICAL`
+9. No hardcoded AWS account IDs in executable code (only in fix comments)
+10. No hardcoded `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` in executable code
+11. OIDC via `aws-actions/configure-aws-credentials@v4` with `role-to-assume`
+12. `IMAGE_URI` shared across steps via `$GITHUB_ENV` (no divergence risk)
+13. Kustomize pinned to v5.7.1, actions pinned (`checkout@v4`, `buildx@v3`)
+14. `npm test` not `yarn test`
+15. ECR registry URL derived from `aws sts get-caller-identity`
+
+**What cannot be validated without a live GitHub Actions run:**
+
+- OIDC token exchange with AWS (requires IAM trust relationship configured in the account)
+- `docker build` success (requires a Dockerfile at the repo root)
+- `npm test` pass (requires the Node.js project with a working test suite)
+- Trivy scan results on the built image
+- GitOps commit push permissions on the actual repository
+
+**To trigger a live run:**
 ```bash
-# The pipeline is at ci-cd/pipeline.yml (GitHub Actions workflow).
-# To test:
-
-# 1. Build + test runs on ANY branch push:
+# Build + test on any branch (push to ECR is skipped — not main):
 git push origin solution/gideon-warui
-# → Triggers build, test, Trivy scan. Push to ECR is skipped (not main).
 
-# 2. Full pipeline (build + test + scan + push + GitOps) runs on push to main:
+# Full pipeline (build + test + scan + push + GitOps) on merge to main:
 git checkout main && git merge solution/gideon-warui && git push origin main
-# → Triggers full pipeline including ECR push and kustomize image tag update.
 
-# 3. PR to main triggers build + test only (no push):
+# PR triggers build + test only:
 gh pr create --base main --head solution/gideon-warui
 
 # Prerequisites:
 # - AWS_ROLE_ARN secret configured in GitHub repo settings
 # - OIDC trust relationship configured in AWS IAM for GitHub Actions
 # - ECR repository acme/api-service exists in af-south-1
+# - Dockerfile present at repo root
 ```
 
 ### Task 4
