@@ -28,7 +28,7 @@
 
 - [x] Task 1a — Fixed Terraform bugs
 - [x] Task 1b — Extended EKS module (IRSA + node group)
-- [ ] Task 1c — Added remote state backend config
+- [x] Task 1c — Added remote state backend config
 - [ ] Task 2a — Fixed all 6 Kubernetes issues
 - [ ] Task 2b — Created Kustomize staging overlay
 - [ ] Task 2c — Wrote NetworkPolicy
@@ -72,7 +72,27 @@ Bugs fixed:
 
 #### 1c — Remote State Backend
 
+**Partial backend configuration pattern** (`environments/staging/backend.tf` + `backend.hcl`): Terraform's `backend` block is evaluated before providers and data sources, so variable interpolation is unavailable — writing `bucket = var.state_bucket` is a syntax error. The standard workaround is a partial `backend "s3" {}` in the committed file, with the actual values in a separate `backend.hcl` passed at init time via `terraform init -backend-config=backend.hcl`. This keeps bucket names and account IDs out of static source files while still fully configuring the backend.
 
+**State bucket region** (`backend.hcl`): The S3 state bucket and DynamoDB lock table are in `us-east-1`, not `af-south-1`. This is intentional — the infrastructure region and the state storage region are independent. Keeping state in a stable, always-available region (us-east-1) avoids a scenario where a regional outage in af-south-1 blocks Terraform operations on infrastructure that is itself not affected. A Service Control Policy (SCP) in this account also restricts S3 bucket creation to approved regions, which confirmed this approach.
+
+**`sts_region = "us-east-1"`** (`providers.tf`): af-south-1 is an AWS opt-in region whose regional STS endpoint is not activated by default. Without this setting, the AWS provider fails credential validation with `InvalidClientTokenId` because it tries to call the af-south-1 regional STS endpoint, which is not live. Pinning `sts_region` to `us-east-1` routes credential validation through the global STS endpoint while all resources continue to be provisioned in af-south-1.
+
+**DynamoDB lock table**: Uses `PAY_PER_REQUEST` billing — there is no predictable lock frequency, and provisioned capacity would either be wasteful or throttle unexpectedly on busy pipelines. The `LockID` attribute (string hash key) is the exact schema Terraform's S3 backend expects. Note: `dynamodb_table` is deprecated in Terraform 1.10+ in favour of `use_lockfile`, which uses native S3 conditional writes. For now `dynamodb_table` is retained as the task specification calls for DynamoDB locking explicitly. Migrating to `use_lockfile` is a one-line change once the bucket is confirmed to support S3 object locking.
+
+**Bootstrap commands** (run once before `terraform init`):
+```bash
+aws s3api create-bucket --bucket acme-staging-tfstate-<account-id> --region us-east-1
+aws s3api put-bucket-versioning --bucket acme-staging-tfstate-<account-id> --versioning-configuration Status=Enabled
+aws s3api put-bucket-encryption --bucket acme-staging-tfstate-<account-id> \
+  --server-side-encryption-configuration '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"}}]}'
+aws s3api put-public-access-block --bucket acme-staging-tfstate-<account-id> \
+  --public-access-block-configuration "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"
+aws dynamodb create-table --table-name acme-staging-tfstate-lock \
+  --attribute-definitions AttributeName=LockID,AttributeType=S \
+  --key-schema AttributeName=LockID,KeyType=HASH \
+  --billing-mode PAY_PER_REQUEST --region us-east-1
+```
 
 ### Task 2 — Kubernetes
 
@@ -112,7 +132,22 @@ Bugs fixed:
 
 ### Task 1
 ```bash
-# Commands to validate Terraform
+# Validate all Terraform configs
+cd terraform/environments/staging
+terraform validate
+
+# Initialise with remote backend
+terraform init -backend-config=backend.hcl
+
+# Generate and review plan (requires af-south-1 to be enabled in the AWS account)
+terraform plan -var="app_bucket_suffix=app-data" -out=tfplan
+terraform show -no-color tfplan > ../../plan-output.txt
+
+# Apply
+terraform apply tfplan
+
+# Destroy when done
+terraform destroy -var="app_bucket_suffix=app-data"
 ```
 
 ### Task 2
