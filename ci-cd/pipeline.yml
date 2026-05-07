@@ -16,7 +16,7 @@ env:
 
 permissions:
   id-token: write   # required for OIDC JWT request
-  contents: read
+  contents: write   # required for GitOps commit back to repo
 
 jobs:
   build:
@@ -63,4 +63,13 @@ jobs:
           docker push \
             ${{ steps.ecr-login.outputs.registry }}/$ECR_REPOSITORY:${{ github.sha }}
 
-      # TODO (Task 3c): Add GitOps update step here (push to main only)
+      - name: Update staging image tag in kustomization
+        if: github.event_name == 'push'
+        run: |
+          cd kubernetes/overlays/staging
+          kustomize edit set image ghcr.io/acme/api-service=${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add kustomization.yaml
+          git commit -m "chore(gitops): update api-service image to ${{ github.sha }}"
+          git push
