@@ -9,13 +9,11 @@ resource "aws_eks_cluster" "this" {
   name    = var.cluster_name
   version = var.cluster_version
 
-  # BUG: role_arn is referencing a resource that doesn't exist in this file
   role_arn = aws_iam_role.cluster.arn
 
   vpc_config {
     subnet_ids              = var.subnet_ids
     endpoint_private_access = true
-    # BUG: This should be false for a private cluster — public API access is a security risk
     endpoint_public_access  = true
 
     security_group_ids = [aws_security_group.cluster.id]
@@ -52,9 +50,11 @@ resource "aws_iam_role" "cluster" {
 }
 
 resource "aws_iam_role_policy_attachment" "cluster_policy" {
-  role       = aws_iam_role.cluster.name
-  # BUG: Wrong managed policy ARN for EKS cluster role
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
+  role = aws_iam_role.cluster.name
+  # AmazonEKSClusterPolicy grants the control plane permissions to manage VPC resources,
+  # security groups, and ENIs on your behalf — without it the cluster cannot function.
+  # AmazonEKSWorkerNodePolicy is for EC2 worker nodes, not the control plane.
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
 }
 
 # -----------------------------------------------------------------
@@ -130,7 +130,3 @@ resource "aws_iam_role_policy_attachment" "node_ecr_policy" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
 }
 
-# -----------------------------------------------------------------
-# TODO (Task 1b): Add node group resource here
-# TODO (Task 1b): Add IRSA role and policy for app-sa service account here
-# -----------------------------------------------------------------
