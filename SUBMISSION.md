@@ -44,17 +44,26 @@
 
 ### Task 1 — Terraform
 
+#### 1a — Bug Fixes
+
 **Restructured the Terraform layout before touching any code.** The original configuration had providers, data sources, locals, and module calls all in a single `main.tf`. Splitting these into `providers.tf`, `data.tf`, `locals.tf`, `outputs.tf`, and `main.tf` follows the standard convention used across most Terraform codebases. The motivation is practical: when multiple engineers work on the same environment, a single large `main.tf` becomes a merge conflict hotspot. Separating concerns by file type means a networking change and an IAM change rarely touch the same file. The module also lacked a `versions.tf` to declare its own provider requirements, which was added to make the module self-documenting and safe to use outside this repo.
 
-**Bug fixes applied:**
+Bugs fixed:
 
-- **Public API endpoint enabled** (`modules/eks-cluster/main.tf`): `endpoint_public_access` was `true`, exposing the Kubernetes API server to the internet. Set to `false` so API access is restricted to within the VPC; required for any production or staging cluster. Engineers use kubectl via VPN or a bastion; this is the expected trade-off.
+- **Wrong IAM policy on cluster role** (`modules/eks-cluster/main.tf`): `AmazonEKSWorkerNodePolicy` was attached to the EKS control plane role. That policy is for EC2 worker nodes. The cluster role needs `AmazonEKSClusterPolicy`, which grants the control plane permission to manage VPC resources, security groups, and ENIs. The cluster would provision but immediately be non-functional without this.
 
-- **Wrong IAM policy on cluster role** (`modules/eks-cluster/main.tf`): `AmazonEKSWorkerNodePolicy` was attached to the EKS control plane role. That policy is for EC2 worker nodes. The cluster role needs `AmazonEKSClusterPolicy`, which grants the control plane permission to manage VPC resources, security groups, and ENIs. The cluster would provision but be non-functional without this.
+- **Public API endpoint enabled** (`modules/eks-cluster/main.tf`): `endpoint_public_access` was `true`, exposing the Kubernetes API server to the internet. Set to `false` to restrict API access to within the VPC. Engineers access kubectl via VPN or a bastion — this is the expected operational trade-off for a private cluster.
 
-- **Control plane placed in public subnets** (`environments/staging/main.tf`): `subnet_ids` was set to `module.vpc.public_subnets`, placing the EKS control plane ENIs in public subnets where they receive public IPs. Moved to `module.vpc.private_subnets`, consistent with `node_group_subnet_ids`. This also makes the `endpoint_public_access = false` fix meaningful — there is no point restricting API access if the ENIs are publicly routable anyway.
+- **ELB subnet discovery tags set to integer instead of string** (`environments/staging/main.tf`): Both `kubernetes.io/role/elb` and `kubernetes.io/role/internal-elb` were set to `0` (integer). The AWS Load Balancer Controller requires these values to be the string `"1"`. With the wrong type, load balancer provisioning silently fails — no ALB or NLB gets created when a Service or Ingress is applied.
 
-- **ELB subnet discovery tags set to integer instead of string** (`environments/staging/main.tf`): Both `kubernetes.io/role/elb` and `kubernetes.io/role/internal-elb` were set to `0` (integer). The AWS Load Balancer Controller and in-tree cloud provider both require these values to be the string `"1"`. With the wrong value, load balancer provisioning silently fails — no ALB or NLB gets created when a Service or Ingress is applied.
+- **Control plane placed in public subnets** (`environments/staging/main.tf`): `subnet_ids` was set to `module.vpc.public_subnets`, placing the EKS control plane ENIs in public subnets where they receive public IPs. Moved to `module.vpc.private_subnets`. This also gives the `endpoint_public_access = false` fix its full effect — there is no point restricting API access if the ENIs are publicly routable anyway.
+
+#### 1b — IRSA and Managed Node Group
+
+
+
+#### 1c — Remote State Backend
+
 
 
 ### Task 2 — Kubernetes

@@ -50,11 +50,8 @@ resource "aws_iam_role" "cluster" {
 }
 
 resource "aws_iam_role_policy_attachment" "cluster_policy" {
-  role = aws_iam_role.cluster.name
-  # AmazonEKSClusterPolicy grants the control plane permissions to manage VPC resources,
-  # security groups, and ENIs on your behalf; without it the cluster cannot function.
-  # AmazonEKSWorkerNodePolicy is for EC2 worker nodes, not the control plane.
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
+  role       = aws_iam_role.cluster.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy" # control plane policy, not worker node
 }
 
 # -----------------------------------------------------------------
