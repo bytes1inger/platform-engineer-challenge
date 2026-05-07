@@ -46,6 +46,15 @@ jobs:
       - name: Run tests
         run: npm test
 
+      - name: Scan image for vulnerabilities
+        uses: aquasecurity/trivy-action@0.30.0
+        with:
+          image-ref: ${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+          format: table
+          exit-code: '1'          # fail pipeline on CRITICAL findings
+          severity: CRITICAL
+          ignore-unfixed: true    # skip CVEs with no available fix
+
       - name: Push image to ECR
         if: github.event_name == 'push'   # skip push on PRs
         run: |
@@ -54,5 +63,4 @@ jobs:
           docker push \
             ${{ steps.ecr-login.outputs.registry }}/$ECR_REPOSITORY:${{ github.sha }}
 
-      # TODO (Task 3b): Add Trivy vulnerability scan here (fail on CRITICAL)
       # TODO (Task 3c): Add GitOps update step here (push to main only)
