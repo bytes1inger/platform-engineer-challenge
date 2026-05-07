@@ -1,8 +1,24 @@
 # Submission — Platform Engineer (DevOps) Challenge
 
-**Candidate name:**
+**Candidate name:** Gideon Warui
 **Date submitted:**
 **Time spent (approximate):**
+
+---
+
+## Environment
+
+| Tool | Version |
+|------|---------|
+| Terraform | v1.15.2 |
+| AWS Provider | v5.100.0 |
+| TLS Provider | v4.2.1 |
+| AWS CLI | v2.34.44 |
+| kubectl | v1.35.2 |
+| Kustomize | v5.7.1 (bundled with kubectl) |
+| Helm | v3.20.0 |
+| OS | Ubuntu 24 / WSL2 x86_64 |
+| AWS Region | af-south-1 (Cape Town) |
 
 ---
 
@@ -25,8 +41,6 @@
 ---
 
 ## Key Decisions and Trade-offs
-
-<!-- For each task, describe 1–2 meaningful choices you made and why -->
 
 ### Task 1 — Terraform
 
@@ -52,8 +66,6 @@
 
 ## Assumptions
 
-<!-- List any assumptions you made where requirements were ambiguous -->
-
 -
 -
 -
@@ -62,8 +74,6 @@
 
 ## What I Would Do With More Time
 
-<!-- Be specific — what would you improve, and why did you deprioritise it? -->
-
 -
 -
 -
@@ -71,8 +81,6 @@
 ---
 
 ## How to Test My Solution
-
-<!-- Give the reviewer clear instructions to validate your work -->
 
 ### Task 1
 ```bash
