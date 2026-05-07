@@ -176,3 +176,51 @@ if ! kubectl get deployment "$DEPLOYMENT" -n "$NAMESPACE" &>/dev/null; then
     || echo "  (none found)"
   exit 1
 fi
+
+# =============================================================================
+# Section 1 — Deployment status
+# Desired vs ready replicas and rollout conditions tell you immediately
+# whether this is a partial outage or complete failure.
+# =============================================================================
+section "1. DEPLOYMENT STATUS"
+
+kubectl get deployment "$DEPLOYMENT" -n "$NAMESPACE" -o wide
+
+echo ""
+echo "--- Rollout conditions ---"
+# --timeout=5s avoids hanging on a stalled rollout; || true so we continue
+kubectl rollout status deployment/"$DEPLOYMENT" -n "$NAMESPACE" --timeout=5s 2>&1 || true
+
+echo ""
+echo "--- Full deployment description ---"
+kubectl describe deployment "$DEPLOYMENT" -n "$NAMESPACE"
+
+# =============================================================================
+# Section 2 — Pod states
+# Restart counts and node placement are the first things to check —
+# a pod in CrashLoopBackOff or OOMKilled tells you the failure mode fast.
+# =============================================================================
+section "2. POD STATES"
+
+# Derive label selector from the deployment spec rather than assuming
+# a fixed label — works for any deployment regardless of label convention
+SELECTOR=$(kubectl get deployment "$DEPLOYMENT" -n "$NAMESPACE" \
+  -o jsonpath='{.spec.selector.matchLabels}' \
+  | sed 's/[{}"]//g' | tr ',' '\n' \
+  | awk -F: '{print $1"="$2}' | tr '\n' ',' | sed 's/,$//')
+
+echo "Label selector: ${SELECTOR}"
+echo ""
+
+kubectl get pods -n "$NAMESPACE" -l "$SELECTOR" \
+  -o custom-columns=\
+"NAME:.metadata.name,\
+STATUS:.status.phase,\
+READY:.status.containerStatuses[0].ready,\
+RESTARTS:.status.containerStatuses[0].restartCount,\
+NODE:.spec.nodeName,\
+AGE:.metadata.creationTimestamp"
+
+echo ""
+echo "--- Pod describe (all matching pods) ---"
+kubectl describe pods -n "$NAMESPACE" -l "$SELECTOR"
