@@ -4,7 +4,6 @@
 *.tfstate.backup
 *.tfplan
 .terraform.lock.hcl
-plan-output.txt
 
 # Credentials — never commit these
 *.pem
