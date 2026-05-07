@@ -3,6 +3,7 @@
 *.tfstate
 *.tfstate.backup
 *.tfplan
+*.tfvars
 .terraform.lock.hcl
 
 # Credentials — never commit these
