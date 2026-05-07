@@ -31,13 +31,12 @@ module "vpc" {
 # ECR — container image registry for the CI/CD pipeline
 # -----------------------------------------------------------------
 
-resource "aws_ecr_repository" "api_service" {
-  name                 = var.ecr_repository_name
-  image_tag_mutability = "IMMUTABLE" # commit-sha tags are unique; prevent overwrites
+module "ecr" {
+  source = "../../modules/ecr"
 
-  image_scanning_configuration {
-    scan_on_push = true
-  }
+  repository_name      = var.ecr_repository_name
+  image_tag_mutability = "IMMUTABLE"
+  scan_on_push         = true
 
   tags = local.common_tags
 }
