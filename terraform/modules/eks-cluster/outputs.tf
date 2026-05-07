@@ -28,3 +28,8 @@ output "node_group_role_arn" {
   description = "IAM role ARN used by the node group"
   value       = aws_iam_role.node_group.arn
 }
+
+output "app_sa_role_arn" {
+  description = "IAM role ARN for the app-sa IRSA service account"
+  value       = aws_iam_role.app_sa.arn
+}

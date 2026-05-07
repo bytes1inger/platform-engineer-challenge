@@ -37,6 +37,7 @@ module "eks" {
   subnet_ids      = module.vpc.private_subnets # control plane ENIs must be in private subnets
 
   node_group_subnet_ids = module.vpc.private_subnets
+  app_bucket_name       = var.app_bucket_name
 
   tags = local.common_tags
 }

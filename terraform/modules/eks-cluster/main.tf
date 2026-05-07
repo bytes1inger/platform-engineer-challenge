@@ -127,3 +127,53 @@ resource "aws_iam_role_policy_attachment" "node_ecr_policy" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
 }
 
+# -----------------------------------------------------------------
+# IRSA — IAM role for the app-sa Kubernetes service account
+# -----------------------------------------------------------------
+
+resource "aws_iam_role" "app_sa" {
+  name = "${var.cluster_name}-app-sa-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect    = "Allow"
+        Principal = { Federated = aws_iam_openid_connect_provider.this.arn }
+        Action    = "sts:AssumeRoleWithWebIdentity"
+        Condition = {
+          StringEquals = {
+            "${replace(aws_iam_openid_connect_provider.this.url, "https://", "")}:sub" = "system:serviceaccount:default:app-sa"
+            "${replace(aws_iam_openid_connect_provider.this.url, "https://", "")}:aud" = "sts.amazonaws.com"
+          }
+        }
+      }
+    ]
+  })
+
+  tags = var.tags
+}
+
+resource "aws_iam_policy" "app_sa_s3" {
+  name = "${var.cluster_name}-app-sa-s3"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = ["s3:GetObject", "s3:ListBucket"]
+        Resource = [
+          "arn:aws:s3:::${var.app_bucket_name}",
+          "arn:aws:s3:::${var.app_bucket_name}/*",
+        ]
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "app_sa_s3" {
+  role       = aws_iam_role.app_sa.name
+  policy_arn = aws_iam_policy.app_sa_s3.arn
+}
+

@@ -60,7 +60,9 @@ Bugs fixed:
 
 #### 1b — IRSA and Managed Node Group
 
+**IRSA role for `app-sa`** (`modules/eks-cluster/main.tf`): An IAM role with a web identity trust policy is added, scoped to a single Kubernetes service account (`system:serviceaccount:default:app-sa`) using the cluster's OIDC issuer as the federated principal. The trust policy includes both the `:sub` condition (restricts to the specific service account) and the `:aud` condition (restricts to the STS endpoint) — both are required; omitting `:aud` makes the role assumable by any workload that gets an OIDC token from this cluster. An inline S3 policy grants only `s3:GetObject` and `s3:ListBucket` on the specific bucket, following least-privilege. The role ARN is exposed as a module output so it can be placed in a Kubernetes ServiceAccount annotation by whatever CD tool manages the cluster.
 
+**Managed node group** (`modules/eks-cluster/main.tf`): A launch template is added to attach an `Environment` tag to each EC2 instance at provision time — this is necessary because `aws_eks_node_group` tags only the node group object in the EKS API, not the underlying EC2 instances. The node group itself uses `t3.medium` instances in the private subnets, with `min=1`, `max=3`, and `desired=1`. The `depends_on` block ensures all three IAM policy attachments complete before the node group is created; without this, nodes can start bootstrapping before the CNI policy is in place and fail to join.
 
 #### 1c — Remote State Backend
 

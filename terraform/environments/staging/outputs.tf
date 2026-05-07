@@ -17,3 +17,8 @@ output "node_group_role_arn" {
   description = "IAM role ARN assigned to the managed node group"
   value       = module.eks.node_group_role_arn
 }
+
+output "app_sa_role_arn" {
+  description = "IRSA role ARN to annotate the app-sa service account with"
+  value       = module.eks.app_sa_role_arn
+}
