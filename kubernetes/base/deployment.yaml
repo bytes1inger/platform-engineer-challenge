@@ -53,7 +53,20 @@ spec:
             limits:
               cpu: "500m"
               memory: "256Mi"
-          # ISSUE 3: No liveness or readiness probes defined
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
       volumes:
         - name: tmp
           emptyDir: {}
