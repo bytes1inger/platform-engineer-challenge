@@ -87,6 +87,25 @@ The following outputs are defined in `environments/staging/outputs.tf` and surfa
 
 The plan creates 43 resources total: VPC (15), EKS cluster + IAM + OIDC + node group (13), S3 bucket + hardening (4), ECR (2), and supporting networking (9). Full plan saved to `terraform/plan-output.txt`.
 
+#### Gitignored Files (Secret Leak Prevention)
+
+The root `.gitignore` prevents the following from being committed:
+
+| Pattern | What it catches | Why |
+|---|---|---|
+| `*.tfvars` | `terraform.tfvars` | Contains real variable values — account IDs, bucket names, CIDR ranges. A `terraform.tfvars.example` is committed instead with placeholder values. |
+| `**/.terraform/` | Provider binaries, module cache, local state copy | `.terraform/terraform.tfstate` contains the remote backend config including bucket ARN. Provider binaries are large and platform-specific. |
+| `*.tfstate` / `*.tfstate.backup` | Local state files | State contains every resource attribute including IAM role ARNs, OIDC thumbprints, and security group IDs. State lives in S3 with encryption, never in git. |
+| `*.tfplan` | Saved plan binaries | Plan files contain the full proposed diff including computed values. The human-readable `plan-output.txt` is committed instead. |
+| `.terraform.lock.hcl` | Dependency lock file | Contains provider hashes — not sensitive, but regenerated per platform. Excluded to avoid merge noise across different OS environments. |
+| `crash.log` / `crash.*.log` | Terraform crash dumps | Crash logs can include partial state data, provider credentials from environment, and internal stack traces. |
+| `override.tf` / `*_override.tf` | Local overrides | Engineers use overrides to test locally (e.g. pointing to a different backend or enabling a debug provider). These should never reach the repo. |
+| `.terraformrc` / `terraform.rc` | CLI config | Can contain provider installation credentials, registry tokens, or plugin cache paths. |
+| `*.pem` / `*.key` | TLS certificates and private keys | Generated during TLS provider operations or manually for testing. |
+| `.env` / `.env.*` | Environment variable files | May contain `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, or other secrets sourced into the shell. |
+
+**`backend.hcl` is committed** for reviewer visibility — it contains the S3 bucket name (which embeds the account ID) and DynamoDB table name. In production, this would follow the same pattern as `tfvars`: gitignored, with a `backend.hcl.example` committed. The account ID is not a secret, but minimising its exposure reduces the attack surface for social engineering and targeted IAM attacks.
+
 #### 1a — Bug Fixes
 
 **Restructured the Terraform layout before touching any code.** The original configuration had providers, data sources, locals, and module calls all in a single `main.tf`. Splitting these into `providers.tf`, `data.tf`, `locals.tf`, `outputs.tf`, and `main.tf` follows the standard convention used across most Terraform codebases. The motivation is practical: when multiple engineers work on the same environment, a single large `main.tf` becomes a merge conflict hotspot. Separating concerns by file type means a networking change and an IAM change rarely touch the same file. The module also lacked a `versions.tf` to declare its own provider requirements, which was added to make the module self-documenting and safe to use outside this repo.
