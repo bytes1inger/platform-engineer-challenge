@@ -35,24 +35,22 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      # BUG 3: AWS account ID is hardcoded
       - name: Login to Amazon ECR
-        run: |
-          aws ecr get-login-password --region $AWS_REGION | \
-            docker login --username AWS --password-stdin \
-            123456789012.dkr.ecr.$AWS_REGION.amazonaws.com
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2   # outputs registry URL — no hardcoded account ID
 
       - name: Build Docker image
         run: |
           docker build -t $ECR_REPOSITORY:${{ github.sha }} .
 
-      # BUG 4: Image is pushed before tests run
+      # BUG 4: Image is pushed before tests run — moved below Run tests
       - name: Push image to ECR
+        if: github.event_name == 'push'   # skip push on PRs
         run: |
           docker tag $ECR_REPOSITORY:${{ github.sha }} \
-            123456789012.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:${{ github.sha }}
+            ${{ steps.ecr-login.outputs.registry }}/$ECR_REPOSITORY:${{ github.sha }}
           docker push \
-            123456789012.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:${{ github.sha }}
+            ${{ steps.ecr-login.outputs.registry }}/$ECR_REPOSITORY:${{ github.sha }}
 
       - name: Run tests
         run: |
