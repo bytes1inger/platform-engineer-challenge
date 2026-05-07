@@ -4,8 +4,11 @@
 
 name: Build and Deploy
 
-# BUG 1: This triggers on ALL events including PRs — image should not be pushed on PRs
-on: push
+on:
+  push:
+    branches: [main]   # image push only on main merges
+  pull_request:
+    branches: [main]   # build and test on PRs, no push
 
 env:
   AWS_REGION: af-south-1
