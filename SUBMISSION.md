@@ -244,23 +244,16 @@ kubectl get deployment api-service -o jsonpath='{.spec.template.spec.securityCon
 
 ### Task 3
 
-**What was validated locally (21 automated checks, all passed):**
+**What was validated locally (23 automated checks, all passed):**
 
-1. YAML syntax parses correctly
-2. Trigger configuration: `push` on all branches + `pull_request` on main
-3. `permissions: id-token: write` present (required for OIDC)
-4. `permissions: contents: write` present (required for GitOps push)
-5. Step ordering: build → test → scan → push → GitOps update
-6. Push and GitOps steps gated on `github.ref == 'refs/heads/main' && github.event_name == 'push'`
-7. `[skip ci]` in GitOps commit message (prevents infinite workflow loop)
-8. Trivy pinned to `aquasecurity/trivy-action@0.30.0`, `exit-code: 1`, `severity: CRITICAL`
-9. No hardcoded AWS account IDs in executable code (only in fix comments)
-10. No hardcoded `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` in executable code
-11. OIDC via `aws-actions/configure-aws-credentials@v4` with `role-to-assume`
-12. `IMAGE_URI` shared across steps via `$GITHUB_ENV` (no divergence risk)
-13. Kustomize pinned to v5.7.1, actions pinned (`checkout@v4`, `buildx@v3`)
-14. `npm test` not `yarn test`
-15. ECR registry URL derived from `aws sts get-caller-identity`
+```bash
+python3 ci-cd/validate-pipeline.py
+```
+
+The script checks YAML structure, step ordering, OIDC permissions, conditional
+gates, security hygiene (no hardcoded credentials or account IDs), Trivy
+configuration, action version pinning, and all 5 labeled bug fixes. See the
+script for the full check list.
 
 **What cannot be validated without a live GitHub Actions run:**
 
