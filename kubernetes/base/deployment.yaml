@@ -32,11 +32,10 @@ spec:
               value: production
             - name: PORT
               value: "3000"
-            # ISSUE 4: SECRET_KEY sourced from a ConfigMap (plaintext), not a Secret
             - name: SECRET_KEY
               valueFrom:
-                configMapKeyRef:
-                  name: api-config
+                secretKeyRef:   # moved from ConfigMap — Secrets are base64-encoded and RBAC-gated
+                  name: api-secret
                   key: secret_key
           securityContext:
             allowPrivilegeEscalation: false  # prevent setuid/setgid escalation

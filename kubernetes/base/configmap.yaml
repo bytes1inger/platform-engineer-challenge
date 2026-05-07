@@ -6,5 +6,3 @@ metadata:
 data:
   NODE_ENV: production
   LOG_LEVEL: info
-  # ISSUE 4: This is sensitive — should be in a Secret, not a ConfigMap
-  secret_key: "super-secret-key-do-not-commit"
