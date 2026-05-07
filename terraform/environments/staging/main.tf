@@ -1,37 +1,3 @@
-# terraform/environments/staging/main.tf
-# This file has intentional bugs. Find and fix them.
-# Document each fix with a comment explaining what was wrong.
-
-terraform {
-  required_version = ">= 1.5.0"
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.0"
-    }
-  }
-}
-
-provider "aws" {
-  region = var.aws_region
-}
-
-# BUG: Data source is referencing a non-existent attribute
-data "aws_caller_identity" "this" {}
-
-data "aws_availability_zones" "available" {
-  state = "available"
-}
-
-locals {
-  cluster_name = "${var.project}-${var.environment}-eks"
-  common_tags = {
-    Project     = var.project
-    Environment = var.environment
-    ManagedBy   = "terraform"
-  }
-}
-
 module "vpc" {
   source  = "terraform-aws-modules/vpc/aws"
   version = "5.1.2"
@@ -48,7 +14,6 @@ module "vpc" {
   enable_dns_hostnames = true
   enable_dns_support   = true
 
-  # BUG: These tags are required for EKS to discover subnets, but the values are wrong
   public_subnet_tags = {
     "kubernetes.io/cluster/${local.cluster_name}" = "owned"
     "kubernetes.io/role/elb"                      = 0
@@ -69,9 +34,7 @@ module "eks" {
   cluster_version = var.cluster_version
   environment     = var.environment
   vpc_id          = module.vpc.vpc_id
-
-  # BUG: This is passing public subnets for the control plane — should be private
-  subnet_ids = module.vpc.public_subnets
+  subnet_ids      = module.vpc.public_subnets
 
   node_group_subnet_ids = module.vpc.private_subnets
 
