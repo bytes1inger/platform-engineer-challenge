@@ -44,6 +44,49 @@
 
 ### Task 1 — Terraform
 
+#### File Layout
+
+```
+terraform/
+├── environments/staging/
+│   ├── backend.tf              # partial S3 backend block (values in backend.hcl)
+│   ├── backend.hcl             # actual bucket/table/region values, passed at init
+│   ├── data.tf                 # data sources (caller identity, region)
+│   ├── locals.tf               # common tags, naming conventions
+│   ├── main.tf                 # module calls (VPC, EKS, ECR) + S3 app bucket
+│   ├── outputs.tf              # root outputs surfaced from modules
+│   ├── providers.tf            # AWS provider config (sts_region workaround)
+│   ├── variables.tf            # all input variables with descriptions and defaults
+│   └── terraform.tfvars.example # example values (tfvars is gitignored)
+├── modules/eks-cluster/
+│   ├── main.tf                 # cluster, IAM roles, OIDC, IRSA, node group
+│   ├── outputs.tf              # cluster_endpoint, oidc_provider_arn, app_sa_role_arn, etc.
+│   ├── variables.tf            # module inputs
+│   └── versions.tf             # required providers
+├── modules/ecr/
+│   ├── main.tf                 # ECR repo + lifecycle policy
+│   ├── outputs.tf              # repository_url, repository_arn
+│   ├── variables.tf            # name, tag mutability, scan_on_push
+│   └── versions.tf             # required providers
+└── plan-output.txt             # saved terraform plan (43 resources)
+```
+
+#### Terraform Outputs
+
+The following outputs are defined in `environments/staging/outputs.tf` and surfaced after `terraform apply`:
+
+| Output | Source | Purpose |
+|---|---|---|
+| `cluster_name` | `module.eks` | EKS cluster identifier |
+| `cluster_endpoint` | `module.eks` | API server URL for kubeconfig |
+| `oidc_provider_arn` | `module.eks` | Used in IRSA trust policies |
+| `node_group_role_arn` | `module.eks` | IAM role attached to worker nodes |
+| `app_sa_role_arn` | `module.eks` | IRSA role ARN — annotate the `app-sa` ServiceAccount with this |
+| `ecr_repository_url` | `module.ecr` | Used by CI/CD to tag and push images |
+| `app_bucket_name` | `aws_s3_bucket` | S3 bucket referenced in the IRSA policy |
+
+The plan creates 43 resources total: VPC (15), EKS cluster + IAM + OIDC + node group (13), S3 bucket + hardening (4), ECR (2), and supporting networking (9). Full plan saved to `terraform/plan-output.txt`.
+
 #### 1a — Bug Fixes
 
 **Restructured the Terraform layout before touching any code.** The original configuration had providers, data sources, locals, and module calls all in a single `main.tf`. Splitting these into `providers.tf`, `data.tf`, `locals.tf`, `outputs.tf`, and `main.tf` follows the standard convention used across most Terraform codebases. The motivation is practical: when multiple engineers work on the same environment, a single large `main.tf` becomes a merge conflict hotspot. Separating concerns by file type means a networking change and an IAM change rarely touch the same file. The module also lacked a `versions.tf` to declare its own provider requirements, which was added to make the module self-documenting and safe to use outside this repo.
