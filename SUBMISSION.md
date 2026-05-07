@@ -29,7 +29,7 @@
 - [x] Task 1a — Fixed Terraform bugs
 - [x] Task 1b — Extended EKS module (IRSA + node group)
 - [x] Task 1c — Added remote state backend config
-- [ ] Task 2a — Fixed all 6 Kubernetes issues
+- [x] Task 2a — Fixed all 6 Kubernetes issues
 - [ ] Task 2b — Created Kustomize staging overlay
 - [ ] Task 2c — Wrote NetworkPolicy
 - [ ] Task 3a — Fixed pipeline bugs
@@ -95,6 +95,25 @@ aws dynamodb create-table --table-name acme-staging-tfstate-lock \
 ```
 
 ### Task 2 — Kubernetes
+
+#### 2a — Bug Fixes
+
+**Issue 1 — Container running as root** (`kubernetes/base/deployment.yaml`): Added a pod-level `securityContext` with `runAsNonRoot: true`, `runAsUser: 1000`, `runAsGroup: 1000`, and `seccompProfile: RuntimeDefault`. Added a container-level `securityContext` with `allowPrivilegeEscalation: false`, `readOnlyRootFilesystem: true`, and `capabilities.drop: ["ALL"]`. Together these eliminate the most common container escape paths: privilege escalation via setuid binaries, writes to the root filesystem for persistence, and Linux capability abuse. `readOnlyRootFilesystem: true` is paired with an `emptyDir` volume mounted at `/tmp` because Node.js needs a writable scratch space at runtime — without this the container would crash on first write.
+
+**Issue 2 — No resource requests or limits** (`kubernetes/base/deployment.yaml`): Set `requests: cpu: 100m, memory: 128Mi` and `limits: cpu: 500m, memory: 256Mi`. Without requests, the scheduler has no basis for placement decisions and can over-commit nodes. Without limits, a single pod can consume all node memory and trigger an OOMKill cascade across unrelated workloads. The values are conservative baselines for a Node.js API — tuning them requires profiling under production load.
+
+**Issue 3 — No liveness or readiness probes** (`kubernetes/base/deployment.yaml`): Added HTTP GET probes on `GET /health:3000`. The readiness probe (`initialDelaySeconds: 5`) gates traffic — Kubernetes will not route requests to a pod until it returns 200. The liveness probe (`initialDelaySeconds: 15`) restarts the container if the process hangs after startup. The different delays matter: too short a liveness delay restarts healthy pods that are still initialising; too short a readiness delay routes traffic to pods not yet ready to serve.
+
+**Issue 4 — SECRET_KEY in plaintext ConfigMap** (`kubernetes/base/deployment.yaml`, `configmap.yaml`, `secret.yaml`): Moved `SECRET_KEY` to a `Secret` resource and updated the deployment env var to use `secretKeyRef`. Removed `secret_key` from the ConfigMap. In Kubernetes, Secrets are base64-encoded (not encrypted at rest by default, but separately controllable via envelope encryption on the etcd level) and are access-controlled by RBAC independently of ConfigMaps. The committed secret value is a placeholder — in production this would be populated by External Secrets Operator pulling from AWS Secrets Manager, so the real value never exists in the repository or in unencrypted cluster state.
+
+**Issue 5 — No PodDisruptionBudget** (`kubernetes/base/pod-disruption-budget.yaml`): Created a PDB with `minAvailable: 1`. Without a PDB, `kubectl drain` during a node upgrade evicts all pods on that node simultaneously, causing downtime. The PDB instructs the eviction API to keep at least one replica running at all times. Note: the base deployment has `replicas: 1` — a PDB with `minAvailable: 1` on a single replica effectively blocks voluntary disruption. The staging overlay raises replicas to 2, at which point the PDB allows one pod to be evicted while the other continues serving.
+
+**Issue 6 — Service type LoadBalancer** (`kubernetes/base/service.yaml`): Changed `type: LoadBalancer` to `type: ClusterIP`. A `LoadBalancer` service provisions a cloud load balancer per service, which is expensive and bypasses any ingress-level routing, TLS termination, and auth middleware. With ingress handled by a dedicated ingress controller (as is standard), services should be `ClusterIP` — reachable within the cluster only, with the ingress controller routing external traffic to them.
+
+#### 2b — Kustomize Staging Overlay
+
+
+#### 2c — NetworkPolicy
 
 
 
