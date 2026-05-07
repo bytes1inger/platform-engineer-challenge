@@ -190,11 +190,41 @@ The design document (`docs/observability-design.md`) proposes a unified observab
 
 ## What I Would Do With More Time
 
-- **Terraform:** Add a VPN/bastion module so the EKS private endpoint is accessible without temporarily enabling public access. Add an `aws_eks_addon` resource for the VPC CNI, CoreDNS, and kube-proxy so add-on lifecycle is managed by Terraform, not manual kubectl.
-- **Kubernetes:** Deploy External Secrets Operator with a SecretStore pointing to AWS Secrets Manager, replacing the placeholder Secret. Add Horizontal Pod Autoscaler manifest for `api-service` with CPU-based scaling.
-- **CI/CD:** Add a separate `test` job that runs in parallel with the build, caching `node_modules` across jobs. Add Slack notification on pipeline failure. Add SBOM generation (Syft) alongside the Trivy scan.
-- **Scripting:** Add a `--format json` flag to `incident.sh` for machine-readable output that could feed into a Slack webhook or incident management system. Add a `--since` flag to scope log and event collection to a time window.
-- **Observability:** Write Terraform for the OpenSearch domain and S3 buckets referenced in the design document. Prototype the kube-prometheus-stack + Thanos deployment with Helm values committed to the repo.
+### Terraform — Repo Structure and Governance
+
+The current layout (`environments/staging/` calling `modules/`) works for one environment, but adding production and eu-west-1 would mean duplicating `main.tf`, `locals.tf`, and `providers.tf` across directories with only variable differences. I would introduce **Terragrunt** to DRY this up — each environment becomes a `terragrunt.hcl` that inherits from a root config and only overrides what differs (region, instance sizes, replica counts). This eliminates copy-paste drift between staging and production.
+
+I would also add **policy-as-code** using Open Policy Agent (OPA) with Conftest, running against `terraform plan` output in CI. Policies I would enforce from day one: no S3 buckets without encryption or public access blocks, no IAM policies with `*` resource, all resources must carry `Environment` and `ManagedBy` tags, no security groups with `0.0.0.0/0` ingress on non-443 ports. These catch the class of bugs I fixed in Task 1 before they reach `terraform apply`.
+
+Beyond that: add `aws_eks_addon` resources for VPC CNI, CoreDNS, and kube-proxy so add-on lifecycle is Terraform-managed. Add a VPN or bastion module so the EKS private endpoint is accessible without temporarily enabling public access. Pin module versions using git tags so environments can upgrade independently. Add **tfsec** or **Checkov** as a pre-commit hook and CI step for static security scanning of HCL.
+
+### Kubernetes — Admission Control and Secret Management
+
+Deploy **External Secrets Operator** with a SecretStore pointing to AWS Secrets Manager, replacing the placeholder Secret. The real value never exists in git or in unencrypted etcd — ESO pulls it at pod start via IRSA.
+
+Add **Kyverno** or **OPA Gatekeeper** as an admission controller with policies that mirror the fixes from Task 2: deny pods without `securityContext.runAsNonRoot`, deny containers without resource limits, deny images with `latest` tag, require the `app` label on all workloads. This prevents the same class of issues from being reintroduced by other teams as they onboard.
+
+Add a HorizontalPodAutoscaler for `api-service` with CPU-based scaling (target 70%), and a cert-manager `ClusterIssuer` backed by Let's Encrypt for automated TLS certificate lifecycle on ingress.
+
+### CI/CD — Supply Chain Security and Multi-Environment
+
+Add **image signing with Cosign** (Sigstore) after the Trivy scan passes, and **SBOM generation with Syft** attached to the image as an OCI artifact. This gives a verifiable chain: build → test → scan → sign → push. Kubernetes admission policy (Kyverno) can then reject unsigned images at deploy time.
+
+Split the pipeline into a reusable workflow template (`.github/workflows/build-test-push.yml`) called from per-environment workflows. Add a matrix strategy for staging/production with environment-specific variables and approval gates (`environment: production` with required reviewers).
+
+Add `node_modules` caching (`actions/cache`) to avoid re-downloading dependencies on every run. Add Slack notification on failure using `slackapi/slack-github-action`. Add branch protection rules requiring the pipeline to pass before merge.
+
+### Scripting — Machine Output and Remediation Hints
+
+Add a `--format json` flag to `incident.sh` for machine-readable output that could feed into a Slack webhook, PagerDuty custom event, or incident management system. Add a `--since` flag (e.g. `--since 30m`) to scope log and event collection to a time window — during active incidents, full history is noise.
+
+Add a summary section that maps observed symptoms to likely causes: `ErrImagePull` → check ECR permissions and image tag; `CrashLoopBackOff` with OOMKilled → check memory limits; `Pending` pods → check node capacity and taints. Not auto-remediation, but guided next-steps for an on-call engineer at 3 AM.
+
+### Observability — Infrastructure as Code for the Stack
+
+Write Terraform for the OpenSearch domain, S3 buckets, and IAM roles referenced in the design document — the observability stack should be as reproducible as the application infrastructure. Commit Helm values for kube-prometheus-stack and Thanos as version-controlled files in the repo, deployed via ArgoCD ApplicationSets so adding a new cluster is a one-line addition.
+
+Prototype OpenTelemetry Collector as a DaemonSet alongside Fluent Bit, ready for application teams to start sending traces once the `trace_id` convention matures. Add a cost monitoring dashboard in Grafana that tracks OpenSearch index sizes, S3 storage growth, and Prometheus cardinality — preventing cost surprises before they hit the $800 ceiling.
 
 ---
 
