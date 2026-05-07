@@ -30,8 +30,8 @@
 - [x] Task 1b — Extended EKS module (IRSA + node group)
 - [x] Task 1c — Added remote state backend config
 - [x] Task 2a — Fixed all 6 Kubernetes issues
-- [ ] Task 2b — Created Kustomize staging overlay
-- [ ] Task 2c — Wrote NetworkPolicy
+- [x] Task 2b — Created Kustomize staging overlay
+- [x] Task 2c — Wrote NetworkPolicy
 - [ ] Task 3a — Fixed pipeline bugs
 - [ ] Task 3b — Applied security improvements (OIDC, Trivy)
 - [ ] Task 3c — Added GitOps update step
@@ -112,8 +112,11 @@ aws dynamodb create-table --table-name acme-staging-tfstate-lock \
 
 #### 2b — Kustomize Staging Overlay
 
+**`kubernetes/overlays/staging/kustomization.yaml`**: Replaced the empty `bases: []` placeholder with a proper `resources: [../../base]` reference (Kustomize v5 deprecated `bases` in favour of `resources`). The `replicas` field patches the deployment count to 2. The `images` field pins the tag to `v1.2.0` without modifying the base manifest — this is the correct GitOps pattern: the base always references the image name and the overlay or CD tooling pins the tag. The `labels` field uses `includeSelectors: false` to add `environment: staging` to resource metadata only; using `commonLabels` would mutate pod selectors and `matchLabels` blocks, making it impossible to remove the label without deleting and recreating the resources.
 
 #### 2c — NetworkPolicy
+
+**`kubernetes/base/network-policy.yaml`**: The policy selects `app: api-service` pods and declares both `Ingress` and `Egress` policy types — declaring both is required; omitting `Egress` from `policyTypes` leaves egress fully open even if no egress rules are defined. Ingress is restricted to pods with `role: ingress-controller` on port 3000 only. Egress allows DNS on UDP/TCP 53 to `kube-dns` pods in `kube-system` — the `namespaceSelector` and `podSelector` are combined in a single `from` entry (AND logic), which restricts DNS to exactly the kube-dns pods in kube-system, not any pod in kube-system or any pod named kube-dns in any namespace. All other ingress and egress is denied by default because both policy types are declared and no other rules are present.
 
 
 
