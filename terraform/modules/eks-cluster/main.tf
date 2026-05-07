@@ -19,7 +19,7 @@ resource "aws_eks_cluster" "this" {
     security_group_ids = [aws_security_group.cluster.id]
   }
 
-  enabled_cluster_log_types = ["api", "audit", "authenticator"]
+  enabled_cluster_log_types = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
 
   tags = var.tags
 
@@ -170,6 +170,13 @@ resource "aws_iam_policy" "app_sa_s3" {
       }
     ]
   })
+
+  lifecycle {
+    precondition {
+      condition     = var.app_bucket_name != ""
+      error_message = "app_bucket_name must not be empty when creating the IRSA S3 policy"
+    }
+  }
 }
 
 resource "aws_iam_role_policy_attachment" "app_sa_s3" {
@@ -208,11 +215,17 @@ resource "aws_eks_node_group" "main" {
   subnet_ids      = var.node_group_subnet_ids
 
   instance_types = ["t3.medium"]
+  ami_type       = "AL2_x86_64"
+  capacity_type  = "ON_DEMAND"
 
   scaling_config {
     desired_size = 1
     min_size     = 1
     max_size     = 3
+  }
+
+  update_config {
+    max_unavailable = 1
   }
 
   launch_template {

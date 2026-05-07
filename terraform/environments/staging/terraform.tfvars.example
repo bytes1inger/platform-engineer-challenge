@@ -1,0 +1,8 @@
+# Copy to terraform.tfvars and fill in real values before running terraform plan/apply
+
+aws_region   = "af-south-1"
+project      = "acme"
+environment  = "staging"
+
+# Name of the pre-existing S3 bucket the app-sa service account needs to read from
+app_bucket_name = "acme-staging-app-data"
