@@ -16,7 +16,12 @@ spec:
       labels:
         app: api-service
     spec:
-      # ISSUE 1: Container runs as root — no securityContext defined
+      securityContext:
+        runAsNonRoot: true  # reject container if image runs as UID 0
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: api
           image: ghcr.io/acme/api-service:latest
@@ -33,5 +38,16 @@ spec:
                 configMapKeyRef:
                   name: api-config
                   key: secret_key
+          securityContext:
+            allowPrivilegeEscalation: false  # prevent setuid/setgid escalation
+            readOnlyRootFilesystem: true      # limits attacker write surface
+            capabilities:
+              drop: ["ALL"]                   # drop all Linux capabilities
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp               # Node.js runtime needs a writable /tmp
           # ISSUE 2: No resource requests or limits defined
           # ISSUE 3: No liveness or readiness probes defined
+      volumes:
+        - name: tmp
+          emptyDir: {}
