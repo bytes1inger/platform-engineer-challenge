@@ -44,9 +44,7 @@ jobs:
           docker build -t $ECR_REPOSITORY:${{ github.sha }} .
 
       - name: Run tests
-        run: |
-          # BUG 5: Wrong command — this project uses npm, not yarn
-          yarn test
+        run: npm test
 
       - name: Push image to ECR
         if: github.event_name == 'push'   # skip push on PRs
