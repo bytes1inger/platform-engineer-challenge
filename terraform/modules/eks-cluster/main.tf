@@ -1,6 +1,3 @@
-# terraform/modules/eks-cluster/main.tf
-# This module has intentional bugs. Find and fix them.
-
 data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
 
@@ -12,19 +9,17 @@ resource "aws_eks_cluster" "this" {
   name    = var.cluster_name
   version = var.cluster_version
 
-  # BUG: role_arn is referencing a resource that doesn't exist in this file
   role_arn = aws_iam_role.cluster.arn
 
   vpc_config {
     subnet_ids              = var.subnet_ids
     endpoint_private_access = true
-    # BUG: This should be false for a private cluster — public API access is a security risk
-    endpoint_public_access  = true
+    endpoint_public_access  = false # API server accessible from within the VPC only
 
     security_group_ids = [aws_security_group.cluster.id]
   }
 
-  enabled_cluster_log_types = ["api", "audit", "authenticator"]
+  enabled_cluster_log_types = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
 
   tags = var.tags
 
@@ -56,8 +51,7 @@ resource "aws_iam_role" "cluster" {
 
 resource "aws_iam_role_policy_attachment" "cluster_policy" {
   role       = aws_iam_role.cluster.name
-  # BUG: Wrong managed policy ARN for EKS cluster role
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy" # control plane policy, not worker node
 }
 
 # -----------------------------------------------------------------
@@ -134,6 +128,117 @@ resource "aws_iam_role_policy_attachment" "node_ecr_policy" {
 }
 
 # -----------------------------------------------------------------
-# TODO (Task 1b): Add node group resource here
-# TODO (Task 1b): Add IRSA role and policy for app-sa service account here
+# IRSA — IAM role for the app-sa Kubernetes service account
 # -----------------------------------------------------------------
+
+resource "aws_iam_role" "app_sa" {
+  name = "${var.cluster_name}-app-sa-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect    = "Allow"
+        Principal = { Federated = aws_iam_openid_connect_provider.this.arn }
+        Action    = "sts:AssumeRoleWithWebIdentity"
+        Condition = {
+          StringEquals = {
+            "${replace(aws_iam_openid_connect_provider.this.url, "https://", "")}:sub" = "system:serviceaccount:default:app-sa"
+            "${replace(aws_iam_openid_connect_provider.this.url, "https://", "")}:aud" = "sts.amazonaws.com"
+          }
+        }
+      }
+    ]
+  })
+
+  tags = var.tags
+}
+
+resource "aws_iam_policy" "app_sa_s3" {
+  name = "${var.cluster_name}-app-sa-s3"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = ["s3:GetObject", "s3:ListBucket"]
+        Resource = [
+          "arn:aws:s3:::${var.app_bucket_name}",
+          "arn:aws:s3:::${var.app_bucket_name}/*",
+        ]
+      }
+    ]
+  })
+
+  lifecycle {
+    precondition {
+      condition     = var.app_bucket_name != ""
+      error_message = "app_bucket_name must not be empty when creating the IRSA S3 policy"
+    }
+  }
+}
+
+resource "aws_iam_role_policy_attachment" "app_sa_s3" {
+  role       = aws_iam_role.app_sa.name
+  policy_arn = aws_iam_policy.app_sa_s3.arn
+}
+
+# -----------------------------------------------------------------
+# Launch Template — tags EC2 instances with Environment at launch time
+# -----------------------------------------------------------------
+
+resource "aws_launch_template" "nodes" {
+  name_prefix = "${var.cluster_name}-nodes-"
+
+  tag_specifications {
+    resource_type = "instance"
+    tags = merge(var.tags, {
+      Name        = "${var.cluster_name}-node"
+      Environment = var.environment
+    })
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+# -----------------------------------------------------------------
+# Managed Node Group
+# -----------------------------------------------------------------
+
+resource "aws_eks_node_group" "main" {
+  cluster_name    = aws_eks_cluster.this.name
+  node_group_name = "${var.cluster_name}-main"
+  node_role_arn   = aws_iam_role.node_group.arn
+  subnet_ids      = var.node_group_subnet_ids
+
+  instance_types = ["t3.medium"]
+  ami_type       = "AL2_x86_64"
+  capacity_type  = "ON_DEMAND"
+
+  scaling_config {
+    desired_size = 1
+    min_size     = 1
+    max_size     = 3
+  }
+
+  update_config {
+    max_unavailable = 1
+  }
+
+  launch_template {
+    id      = aws_launch_template.nodes.id
+    version = "$Latest"
+  }
+
+  tags = var.tags
+
+  depends_on = [
+    aws_iam_role_policy_attachment.node_worker_policy,
+    aws_iam_role_policy_attachment.node_cni_policy,
+    aws_iam_role_policy_attachment.node_ecr_policy,
+  ]
+}
+

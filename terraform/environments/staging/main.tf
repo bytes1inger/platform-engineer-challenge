@@ -1,37 +1,3 @@
-# terraform/environments/staging/main.tf
-# This file has intentional bugs. Find and fix them.
-# Document each fix with a comment explaining what was wrong.
-
-terraform {
-  required_version = ">= 1.5.0"
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.0"
-    }
-  }
-}
-
-provider "aws" {
-  region = var.aws_region
-}
-
-# BUG: Data source is referencing a non-existent attribute
-data "aws_caller_identity" "this" {}
-
-data "aws_availability_zones" "available" {
-  state = "available"
-}
-
-locals {
-  cluster_name = "${var.project}-${var.environment}-eks"
-  common_tags = {
-    Project     = var.project
-    Environment = var.environment
-    ManagedBy   = "terraform"
-  }
-}
-
 module "vpc" {
   source  = "terraform-aws-modules/vpc/aws"
   version = "5.1.2"
@@ -48,18 +14,60 @@ module "vpc" {
   enable_dns_hostnames = true
   enable_dns_support   = true
 
-  # BUG: These tags are required for EKS to discover subnets, but the values are wrong
   public_subnet_tags = {
     "kubernetes.io/cluster/${local.cluster_name}" = "owned"
-    "kubernetes.io/role/elb"                      = 0
+    "kubernetes.io/role/elb"                      = "1" # must be string "1" for ALB/NLB subnet discovery
   }
 
   private_subnet_tags = {
     "kubernetes.io/cluster/${local.cluster_name}" = "owned"
-    "kubernetes.io/role/internal-elb"             = 0
+    "kubernetes.io/role/internal-elb"             = "1" # must be string "1" for internal load balancer discovery
   }
 
   tags = local.common_tags
+}
+
+# -----------------------------------------------------------------
+# ECR — container image registry for the CI/CD pipeline
+# -----------------------------------------------------------------
+
+module "ecr" {
+  source = "../../modules/ecr"
+
+  repository_name      = var.ecr_repository_name
+  image_tag_mutability = "IMMUTABLE"
+  scan_on_push         = true
+
+  tags = local.common_tags
+}
+
+# -----------------------------------------------------------------
+# S3 — application data bucket (referenced by the IRSA policy)
+# -----------------------------------------------------------------
+
+resource "aws_s3_bucket" "app_data" {
+  bucket = "${var.project}-${var.environment}-${var.app_bucket_suffix}"
+  tags   = local.common_tags
+}
+
+resource "aws_s3_bucket_versioning" "app_data" {
+  bucket = aws_s3_bucket.app_data.id
+  versioning_configuration { status = "Enabled" }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "app_data" {
+  bucket = aws_s3_bucket.app_data.id
+  rule {
+    apply_server_side_encryption_by_default { sse_algorithm = "AES256" }
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "app_data" {
+  bucket                  = aws_s3_bucket.app_data.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
 }
 
 module "eks" {
@@ -69,11 +77,10 @@ module "eks" {
   cluster_version = var.cluster_version
   environment     = var.environment
   vpc_id          = module.vpc.vpc_id
-
-  # BUG: This is passing public subnets for the control plane — should be private
-  subnet_ids = module.vpc.public_subnets
+  subnet_ids      = module.vpc.private_subnets # control plane ENIs must be in private subnets
 
   node_group_subnet_ids = module.vpc.private_subnets
+  app_bucket_name       = aws_s3_bucket.app_data.bucket
 
   tags = local.common_tags
 }

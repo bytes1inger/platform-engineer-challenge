@@ -1,11 +1,18 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# TODO (Task 2b): Build this overlay
-# Requirements:
-#   - Base: ../../base
-#   - Set replicas to 2
-#   - Set image tag to v1.2.0
-#   - Add label environment: staging to all resources
+resources:
+  - ../../base
 
-bases: []
+replicas:
+  - name: api-service
+    count: 2
+
+images:
+  - name: ghcr.io/acme/api-service
+    newTag: v1.2.0
+
+labels:
+  - pairs:
+      environment: staging
+    includeSelectors: false   # add to metadata only — avoids mutating pod selectors

@@ -1,0 +1,277 @@
+Triage report: /tmp/triage-nginx-demo-20260507-224031.log
+Started: Thu May  7 22:40:31 EAT 2026
+Target: namespace=default, deployment=nginx-demo
+Checking cluster connectivity...
+Checking namespace access...
+Checking RBAC permissions in namespace 'default'...
+  ✓ get events
+  ✓ get hpa
+  ✓ logs
+  ✓ get deployments
+  ✓ get pods
+
+All permission checks passed.
+
+============================================================
+  1. DEPLOYMENT STATUS
+  2026-05-07 22:40:46
+============================================================
+NAME         READY   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS   IMAGES         SELECTOR
+nginx-demo   2/2     2            2           80s   nginx        nginx:alpine   app=nginx-demo
+
+--- Rollout conditions ---
+deployment "nginx-demo" successfully rolled out
+
+--- Full deployment description ---
+Name:                   nginx-demo
+Namespace:              default
+CreationTimestamp:      Thu, 07 May 2026 22:39:28 +0300
+Labels:                 app=nginx-demo
+Annotations:            deployment.kubernetes.io/revision: 1
+Selector:               app=nginx-demo
+Replicas:               2 desired | 2 updated | 2 total | 2 available | 0 unavailable
+StrategyType:           RollingUpdate
+MinReadySeconds:        0
+RollingUpdateStrategy:  25% max unavailable, 25% max surge
+Pod Template:
+  Labels:  app=nginx-demo
+  Containers:
+   nginx:
+    Image:         nginx:alpine
+    Port:          <none>
+    Host Port:     <none>
+    Environment:   <none>
+    Mounts:        <none>
+  Volumes:         <none>
+  Node-Selectors:  <none>
+  Tolerations:     <none>
+Conditions:
+  Type           Status  Reason
+  ----           ------  ------
+  Available      True    MinimumReplicasAvailable
+  Progressing    True    NewReplicaSetAvailable
+OldReplicaSets:  <none>
+NewReplicaSet:   nginx-demo-8447d6fc8f (2/2 replicas created)
+Events:
+  Type    Reason             Age   From                   Message
+  ----    ------             ----  ----                   -------
+  Normal  ScalingReplicaSet  83s   deployment-controller  Scaled up replica set nginx-demo-8447d6fc8f to 2
+
+============================================================
+  2. POD STATES
+  2026-05-07 22:40:51
+============================================================
+Label selector: app=nginx-demo
+
+NAME                          STATUS    READY   RESTARTS   NODE                                          AGE
+nginx-demo-8447d6fc8f-dj8qv   Running   true    0          ip-10-10-11-239.af-south-1.compute.internal   2026-05-07T19:39:28Z
+nginx-demo-8447d6fc8f-fpkvk   Running   true    0          ip-10-10-11-239.af-south-1.compute.internal   2026-05-07T19:39:28Z
+
+--- Pod describe (all matching pods) ---
+Name:             nginx-demo-8447d6fc8f-dj8qv
+Namespace:        default
+Priority:         0
+Service Account:  default
+Node:             ip-10-10-11-239.af-south-1.compute.internal/10.10.11.239
+Start Time:       Thu, 07 May 2026 22:39:28 +0300
+Labels:           app=nginx-demo
+                  pod-template-hash=8447d6fc8f
+Annotations:      <none>
+Status:           Running
+IP:               10.10.27.150
+IPs:
+  IP:           10.10.27.150
+Controlled By:  ReplicaSet/nginx-demo-8447d6fc8f
+Containers:
+  nginx:
+    Container ID:   containerd://d4783b8d26ef08a24fdfa458fdef2bd55bd39d1a6102e7612db4605d99aacefe
+    Image:          nginx:alpine
+    Image ID:       docker.io/library/nginx@sha256:5616878291a2eed594aee8db4dade5878cf7edcb475e59193904b198d9b830de
+    Port:           <none>
+    Host Port:      <none>
+    State:          Running
+      Started:      Thu, 07 May 2026 22:39:35 +0300
+    Ready:          True
+    Restart Count:  0
+    Environment:    <none>
+    Mounts:
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-mcpv2 (ro)
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   True 
+  Initialized                 True 
+  Ready                       True 
+  ContainersReady             True 
+  PodScheduled                True 
+Volumes:
+  kube-api-access-mcpv2:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    Optional:                false
+    DownwardAPI:             true
+QoS Class:                   BestEffort
+Node-Selectors:              <none>
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type    Reason     Age   From               Message
+  ----    ------     ----  ----               -------
+  Normal  Scheduled  88s   default-scheduler  Successfully assigned default/nginx-demo-8447d6fc8f-dj8qv to ip-10-10-11-239.af-south-1.compute.internal
+  Normal  Pulling    88s   kubelet            spec.containers{nginx}: Pulling image "nginx:alpine"
+  Normal  Pulled     81s   kubelet            spec.containers{nginx}: Successfully pulled image "nginx:alpine" in 6.442s (6.442s including waiting). Image size: 26013346 bytes.
+  Normal  Created    81s   kubelet            spec.containers{nginx}: Created container: nginx
+  Normal  Started    81s   kubelet            spec.containers{nginx}: Started container nginx
+
+
+Name:             nginx-demo-8447d6fc8f-fpkvk
+Namespace:        default
+Priority:         0
+Service Account:  default
+Node:             ip-10-10-11-239.af-south-1.compute.internal/10.10.11.239
+Start Time:       Thu, 07 May 2026 22:39:28 +0300
+Labels:           app=nginx-demo
+                  pod-template-hash=8447d6fc8f
+Annotations:      <none>
+Status:           Running
+IP:               10.10.7.220
+IPs:
+  IP:           10.10.7.220
+Controlled By:  ReplicaSet/nginx-demo-8447d6fc8f
+Containers:
+  nginx:
+    Container ID:   containerd://c1f5d2739c7bfbc677ef133ad9c56a381a7cb7bbd6df0708a92f2c8b6da71c89
+    Image:          nginx:alpine
+    Image ID:       docker.io/library/nginx@sha256:5616878291a2eed594aee8db4dade5878cf7edcb475e59193904b198d9b830de
+    Port:           <none>
+    Host Port:      <none>
+    State:          Running
+      Started:      Thu, 07 May 2026 22:39:35 +0300
+    Ready:          True
+    Restart Count:  0
+    Environment:    <none>
+    Mounts:
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-l8bzz (ro)
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   True 
+  Initialized                 True 
+  Ready                       True 
+  ContainersReady             True 
+  PodScheduled                True 
+Volumes:
+  kube-api-access-l8bzz:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    Optional:                false
+    DownwardAPI:             true
+QoS Class:                   BestEffort
+Node-Selectors:              <none>
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type    Reason     Age   From               Message
+  ----    ------     ----  ----               -------
+  Normal  Scheduled  88s   default-scheduler  Successfully assigned default/nginx-demo-8447d6fc8f-fpkvk to ip-10-10-11-239.af-south-1.compute.internal
+  Normal  Pulling    88s   kubelet            spec.containers{nginx}: Pulling image "nginx:alpine"
+  Normal  Pulled     81s   kubelet            spec.containers{nginx}: Successfully pulled image "nginx:alpine" in 6.491s (6.491s including waiting). Image size: 26013346 bytes.
+  Normal  Created    81s   kubelet            spec.containers{nginx}: Created container: nginx
+  Normal  Started    81s   kubelet            spec.containers{nginx}: Started container nginx
+
+============================================================
+  3. RECENT EVENTS (last 20, sorted by time)
+  2026-05-07 22:40:56
+============================================================
+LAST SEEN   TYPE     REASON              OBJECT                  MESSAGE
+90s         Normal   ScalingReplicaSet   deployment/nginx-demo   Scaled up replica set nginx-demo-8447d6fc8f to 2
+
+--- Events for pods in this deployment ---
+
+Events for pod: nginx-demo-8447d6fc8f-dj8qv
+LAST SEEN   TYPE     REASON      OBJECT                            MESSAGE
+93s         Normal   Scheduled   pod/nginx-demo-8447d6fc8f-dj8qv   Successfully assigned default/nginx-demo-8447d6fc8f-dj8qv to ip-10-10-11-239.af-south-1.compute.internal
+93s         Normal   Pulling     pod/nginx-demo-8447d6fc8f-dj8qv   Pulling image "nginx:alpine"
+86s         Normal   Pulled      pod/nginx-demo-8447d6fc8f-dj8qv   Successfully pulled image "nginx:alpine" in 6.442s (6.442s including waiting). Image size: 26013346 bytes.
+86s         Normal   Created     pod/nginx-demo-8447d6fc8f-dj8qv   Created container: nginx
+86s         Normal   Started     pod/nginx-demo-8447d6fc8f-dj8qv   Started container nginx
+
+Events for pod: nginx-demo-8447d6fc8f-fpkvk
+LAST SEEN   TYPE     REASON      OBJECT                            MESSAGE
+95s         Normal   Scheduled   pod/nginx-demo-8447d6fc8f-fpkvk   Successfully assigned default/nginx-demo-8447d6fc8f-fpkvk to ip-10-10-11-239.af-south-1.compute.internal
+95s         Normal   Pulling     pod/nginx-demo-8447d6fc8f-fpkvk   Pulling image "nginx:alpine"
+88s         Normal   Pulled      pod/nginx-demo-8447d6fc8f-fpkvk   Successfully pulled image "nginx:alpine" in 6.491s (6.491s including waiting). Image size: 26013346 bytes.
+88s         Normal   Created     pod/nginx-demo-8447d6fc8f-fpkvk   Created container: nginx
+88s         Normal   Started     pod/nginx-demo-8447d6fc8f-fpkvk   Started container nginx
+
+============================================================
+  4. RECENT LOGS (last 50 lines per pod, with timestamps)
+  2026-05-07 22:41:02
+============================================================
+
+--- Logs: nginx-demo-8447d6fc8f-dj8qv ---
+Container: nginx
+
+2026-05-07T19:39:35.393450029Z /docker-entrypoint.sh: /docker-entrypoint.d/ is not empty, will attempt to perform configuration
+2026-05-07T19:39:35.393479125Z /docker-entrypoint.sh: Looking for shell scripts in /docker-entrypoint.d/
+2026-05-07T19:39:35.393483457Z /docker-entrypoint.sh: Launching /docker-entrypoint.d/10-listen-on-ipv6-by-default.sh
+2026-05-07T19:39:35.398400004Z 10-listen-on-ipv6-by-default.sh: info: Getting the checksum of /etc/nginx/conf.d/default.conf
+2026-05-07T19:39:35.411043759Z 10-listen-on-ipv6-by-default.sh: info: Enabled listen on IPv6 in /etc/nginx/conf.d/default.conf
+2026-05-07T19:39:35.411335090Z /docker-entrypoint.sh: Sourcing /docker-entrypoint.d/15-local-resolvers.envsh
+2026-05-07T19:39:35.411344792Z /docker-entrypoint.sh: Launching /docker-entrypoint.d/20-envsubst-on-templates.sh
+2026-05-07T19:39:35.415524189Z /docker-entrypoint.sh: Launching /docker-entrypoint.d/30-tune-worker-processes.sh
+2026-05-07T19:39:35.416918976Z /docker-entrypoint.sh: Configuration complete; ready for start up
+2026-05-07T19:39:35.429427083Z 2026/05/07 19:39:35 [notice] 1#1: using the "epoll" event method
+2026-05-07T19:39:35.429442877Z 2026/05/07 19:39:35 [notice] 1#1: nginx/1.29.8
+2026-05-07T19:39:35.429446010Z 2026/05/07 19:39:35 [notice] 1#1: built by gcc 15.2.0 (Alpine 15.2.0) 
+2026-05-07T19:39:35.429449231Z 2026/05/07 19:39:35 [notice] 1#1: OS: Linux 5.10.245-245.983.amzn2.x86_64
+2026-05-07T19:39:35.429461496Z 2026/05/07 19:39:35 [notice] 1#1: getrlimit(RLIMIT_NOFILE): 1048576:1048576
+2026-05-07T19:39:35.429471687Z 2026/05/07 19:39:35 [notice] 1#1: start worker processes
+2026-05-07T19:39:35.432065523Z 2026/05/07 19:39:35 [notice] 1#1: start worker process 31
+2026-05-07T19:39:35.432076330Z 2026/05/07 19:39:35 [notice] 1#1: start worker process 32
+
+--- Logs: nginx-demo-8447d6fc8f-fpkvk ---
+Container: nginx
+
+2026-05-07T19:39:35.436465902Z /docker-entrypoint.sh: /docker-entrypoint.d/ is not empty, will attempt to perform configuration
+2026-05-07T19:39:35.436484996Z /docker-entrypoint.sh: Looking for shell scripts in /docker-entrypoint.d/
+2026-05-07T19:39:35.437376787Z /docker-entrypoint.sh: Launching /docker-entrypoint.d/10-listen-on-ipv6-by-default.sh
+2026-05-07T19:39:35.440323295Z 10-listen-on-ipv6-by-default.sh: info: Getting the checksum of /etc/nginx/conf.d/default.conf
+2026-05-07T19:39:35.449818409Z 10-listen-on-ipv6-by-default.sh: info: Enabled listen on IPv6 in /etc/nginx/conf.d/default.conf
+2026-05-07T19:39:35.449975022Z /docker-entrypoint.sh: Sourcing /docker-entrypoint.d/15-local-resolvers.envsh
+2026-05-07T19:39:35.450129189Z /docker-entrypoint.sh: Launching /docker-entrypoint.d/20-envsubst-on-templates.sh
+2026-05-07T19:39:35.452586195Z /docker-entrypoint.sh: Launching /docker-entrypoint.d/30-tune-worker-processes.sh
+2026-05-07T19:39:35.453707917Z /docker-entrypoint.sh: Configuration complete; ready for start up
+2026-05-07T19:39:35.459288495Z 2026/05/07 19:39:35 [notice] 1#1: using the "epoll" event method
+2026-05-07T19:39:35.459303309Z 2026/05/07 19:39:35 [notice] 1#1: nginx/1.29.8
+2026-05-07T19:39:35.459306563Z 2026/05/07 19:39:35 [notice] 1#1: built by gcc 15.2.0 (Alpine 15.2.0) 
+2026-05-07T19:39:35.459309166Z 2026/05/07 19:39:35 [notice] 1#1: OS: Linux 5.10.245-245.983.amzn2.x86_64
+2026-05-07T19:39:35.459311784Z 2026/05/07 19:39:35 [notice] 1#1: getrlimit(RLIMIT_NOFILE): 1048576:1048576
+2026-05-07T19:39:35.459333387Z 2026/05/07 19:39:35 [notice] 1#1: start worker processes
+2026-05-07T19:39:35.460257317Z 2026/05/07 19:39:35 [notice] 1#1: start worker process 29
+2026-05-07T19:39:35.460266620Z 2026/05/07 19:39:35 [notice] 1#1: start worker process 30
+
+============================================================
+  5. RESOURCE USAGE (kubectl top)
+  2026-05-07 22:41:12
+============================================================
+WARNING: kubectl top unavailable — metrics-server may not be installed
+
+============================================================
+  6. HPA STATUS
+  2026-05-07 22:41:14
+============================================================
+No HPA found for deployment 'nginx-demo' in namespace 'default'
+
+============================================================
+  TRIAGE COMPLETE
+  2026-05-07 22:41:15
+============================================================
+Report saved to: /tmp/triage-nginx-demo-20260507-224031.log
+Finished: Thu May  7 22:41:15 EAT 2026
+
+Next steps if issue not resolved:
+  1. Check node conditions:  kubectl get nodes
+  2. Check PV/PVC status:    kubectl get pvc -n default
+  3. Check network policies: kubectl get networkpolicy -n default
+  4. Check RBAC:             kubectl auth can-i --list --as=system:serviceaccount:default:default

@@ -1,0 +1,10 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: api-service-pdb
+  namespace: default
+spec:
+  minAvailable: 1   # at least 1 pod must remain available during node drain or rolling update
+  selector:
+    matchLabels:
+      app: api-service

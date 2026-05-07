@@ -1,22 +1,28 @@
-# ci-cd/pipeline.yml
-# This pipeline has at least 5 bugs and several security issues.
-# Find and fix them. Document each change with a comment.
-
 name: Build and Deploy
 
-# BUG 1: This triggers on ALL events including PRs — image should not be pushed on PRs
-on: push
+# FIX 1: Was "on: push" — fired on every branch and every PR event.
+# Build and test now run on all branches so developers get feedback early.
+# Push to ECR and GitOps update are gated to push to main only.
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main]
 
 env:
   AWS_REGION: af-south-1
   ECR_REPOSITORY: acme/api-service
-  # BUG 2: Hardcoded credentials — replace with OIDC-based auth (Task 3b)
-  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
 jobs:
-  build:
+  build-and-test:
     runs-on: ubuntu-latest
+    # FIX 2 (unlabeled): permissions block is mandatory for OIDC.
+    # Without id-token: write the runner cannot request a JWT from GitHub
+    # to exchange for AWS STS credentials.
+    permissions:
+      id-token: write
+      contents: write   # needed for GitOps commit push
+      pull-requests: read
 
     steps:
       - name: Checkout code
@@ -25,29 +31,77 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # BUG 3: AWS account ID is hardcoded
+      # FIX 2: Removed hardcoded AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY.
+      # Long-lived keys rotate infrequently, leak through logs, and are
+      # exposed in forked PR runs. OIDC issues a short-lived token per run.
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # FIX 3: Account ID was hardcoded as 123456789012 in both the login
+      # and push steps. Derived dynamically from the caller identity instead.
+      - name: Derive ECR registry URL
+        id: ecr-registry
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "registry=${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com" >> $GITHUB_OUTPUT
+
       - name: Login to Amazon ECR
         run: |
-          aws ecr get-login-password --region $AWS_REGION | \
+          aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
             docker login --username AWS --password-stdin \
-            123456789012.dkr.ecr.$AWS_REGION.amazonaws.com
+            ${{ steps.ecr-registry.outputs.registry }}
+
+      # FIX (unlabeled): IMAGE_URI set once and shared across all steps.
+      # Previously each step reconstructed the URI independently — a tag
+      # change in one place would silently diverge from the others.
+      - name: Set image URI
+        run: |
+          echo "IMAGE_URI=${{ steps.ecr-registry.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}" >> $GITHUB_ENV
 
       - name: Build Docker image
-        run: |
-          docker build -t $ECR_REPOSITORY:${{ github.sha }} .
+        run: docker build -t ${{ env.IMAGE_URI }} .
 
-      # BUG 4: Image is pushed before tests run
-      - name: Push image to ECR
-        run: |
-          docker tag $ECR_REPOSITORY:${{ github.sha }} \
-            123456789012.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:${{ github.sha }}
-          docker push \
-            123456789012.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:${{ github.sha }}
-
+      # FIX 5: Was "yarn test" — this project uses npm.
       - name: Run tests
-        run: |
-          # BUG 5: Wrong command — this project uses npm, not yarn
-          yarn test
+        run: npm test
 
-      # TODO (Task 3b): Add Trivy vulnerability scan here (fail on CRITICAL)
-      # TODO (Task 3c): Add GitOps update step here (push to main only)
+      # FIX 4: Push was happening before tests ran.
+      # Broken or vulnerable images were reaching ECR before any validation.
+      # Correct order: build → test → scan → push.
+      #
+      # ADDED (3b): Trivy scans the locally built image before push.
+      # exit-code: 1 blocks the push step on any CRITICAL finding.
+      - name: Scan image for vulnerabilities
+        uses: aquasecurity/trivy-action@0.30.0
+        with:
+          image-ref: ${{ env.IMAGE_URI }}
+          format: table
+          severity: CRITICAL
+          exit-code: 1
+          ignore-unfixed: true
+
+      # FIX (unlabeled): No conditional existed on the push step.
+      # Combined ref + event check — removing the trigger filter alone
+      # would not have protected this step.
+      - name: Push image to ECR
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: docker push ${{ env.IMAGE_URI }}
+
+      # ADDED (3c): GitOps — update the staging overlay image tag and commit
+      # back so ArgoCD/Flux can detect and deploy the change automatically.
+      # [skip ci] prevents this commit from re-triggering the workflow.
+      - name: Update staging image tag
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          curl -sL "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.7.1/kustomize_v5.7.1_linux_amd64.tar.gz" \
+            | tar xz -C /tmp && sudo mv /tmp/kustomize /usr/local/bin/
+          cd kubernetes/overlays/staging
+          kustomize edit set image api-service=${{ env.IMAGE_URI }}
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add kustomization.yaml
+          git commit -m "chore: update api-service image to ${{ github.sha }} [skip ci]"
+          git push

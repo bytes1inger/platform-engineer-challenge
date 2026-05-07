@@ -16,7 +16,12 @@ spec:
       labels:
         app: api-service
     spec:
-      # ISSUE 1: Container runs as root — no securityContext defined
+      securityContext:
+        runAsNonRoot: true  # reject container if image runs as UID 0
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: api
           image: ghcr.io/acme/api-service:latest
@@ -27,11 +32,40 @@ spec:
               value: production
             - name: PORT
               value: "3000"
-            # ISSUE 4: SECRET_KEY sourced from a ConfigMap (plaintext), not a Secret
             - name: SECRET_KEY
               valueFrom:
-                configMapKeyRef:
-                  name: api-config
+                secretKeyRef:   # moved from ConfigMap — Secrets are base64-encoded and RBAC-gated
+                  name: api-secret
                   key: secret_key
-          # ISSUE 2: No resource requests or limits defined
-          # ISSUE 3: No liveness or readiness probes defined
+          securityContext:
+            allowPrivilegeEscalation: false  # prevent setuid/setgid escalation
+            readOnlyRootFilesystem: true      # limits attacker write surface
+            capabilities:
+              drop: ["ALL"]                   # drop all Linux capabilities
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp               # Node.js runtime needs a writable /tmp
+          resources:                       # prevent unbounded resource consumption and enable scheduler placement
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          livenessProbe:                    # restart hung containers; readinessProbe gates traffic until healthy
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+      volumes:
+        - name: tmp
+          emptyDir: {}

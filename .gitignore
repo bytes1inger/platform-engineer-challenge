@@ -3,8 +3,17 @@
 *.tfstate
 *.tfstate.backup
 *.tfplan
+tfplan
+*.tfvars
 .terraform.lock.hcl
-plan-output.txt
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
 
 # Credentials — never commit these
 *.pem
