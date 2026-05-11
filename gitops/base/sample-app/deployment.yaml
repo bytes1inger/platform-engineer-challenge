@@ -20,6 +20,9 @@ spec:
           image: nginx:1.27-alpine
           ports:
             - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: sample-app-config
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

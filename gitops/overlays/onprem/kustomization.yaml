@@ -6,6 +6,12 @@ namespace: apps
 resources:
   - ../../base/sample-app
 
+configMapGenerator:
+  - name: sample-app-config
+    behavior: merge
+    literals:
+      - APP_ENV=onprem
+
 patches:
   - patch: |-
       - op: replace
