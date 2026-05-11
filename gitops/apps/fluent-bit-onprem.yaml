@@ -45,8 +45,13 @@ spec:
             [OUTPUT]
                 Name  stdout
                 Match *
-                # Production target: AWS OpenSearch in af-south-1 via Direct Connect + TLS
-                # Closes the no-TLS ISO 27001 finding on current Fluentd/ELK setup
+                # Cross-cluster log shipping: on-prem Fluent Bit needs Loki exposed outside EKS.
+                # Production: expose Loki via NLB or ingress, then replace with:
+                #   Name                   loki
+                #   Host                   <loki-nlb-or-ingress-hostname>
+                #   Port                   3100
+                #   Labels                 job=fluent-bit,cluster=omen-onprem
+                #   Auto_Kubernetes_Labels On
 
         tolerations:
           - operator: Exists

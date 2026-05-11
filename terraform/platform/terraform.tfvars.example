@@ -1,6 +1,0 @@
-aws_region             = "af-south-1"
-cluster_name           = "acme-staging-eks"
-onprem_cluster_server  = "https://100.120.215.34:6443"
-onprem_cluster_token   = "<output of: terraform output -raw argocd_manager_token from terraform/environments/onprem>"
-onprem_cluster_name    = "omen-onprem"
-grafana_admin_password = "<choose a strong password>"

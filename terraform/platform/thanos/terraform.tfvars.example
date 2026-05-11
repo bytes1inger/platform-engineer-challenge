@@ -1,0 +1,3 @@
+aws_region        = "af-south-1"
+oidc_provider_arn = "arn:aws:iam::<account-id>:oidc-provider/oidc.eks.af-south-1.amazonaws.com/id/<oidc-id>"
+oidc_issuer_url   = "oidc.eks.af-south-1.amazonaws.com/id/<oidc-id>"

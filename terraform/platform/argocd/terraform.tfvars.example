@@ -1,0 +1,6 @@
+aws_region             = "af-south-1"
+cluster_name           = "acme-staging-eks"
+argocd_chart_version   = "7.7.3"
+onprem_cluster_server  = "https://<tailscale-ip>:6443"
+onprem_cluster_token   = "<argocd-manager-sa-token>"
+onprem_cluster_name    = "omen-onprem"

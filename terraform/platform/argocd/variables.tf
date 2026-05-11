@@ -32,19 +32,3 @@ variable "onprem_cluster_name" {
   type        = string
   default     = "omen-onprem"
 }
-
-variable "grafana_admin_password" {
-  description = "Grafana admin password — store in a tfvars file that is gitignored"
-  type        = string
-  sensitive   = true
-}
-
-variable "oidc_provider_arn" {
-  description = "OIDC provider ARN for IRSA — output from terraform/environments/staging"
-  type        = string
-}
-
-variable "oidc_issuer_url" {
-  description = "OIDC issuer URL (without https://) — output from terraform/environments/staging"
-  type        = string
-}

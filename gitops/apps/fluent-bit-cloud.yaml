@@ -43,14 +43,13 @@ spec:
 
           outputs: |
             [OUTPUT]
-                Name  stdout
-                Match *
-                # Production target: AWS OpenSearch in af-south-1
-                # Name  opensearch
-                # Host  <opensearch-endpoint>
-                # Port  443
-                # TLS   On
-                # Index fluentbit
+                Name                   loki
+                Match                  *
+                Host                   loki.monitoring.svc.cluster.local
+                Port                   3100
+                Labels                 job=fluent-bit,cluster=eks-af-south-1
+                Label_keys             $kubernetes['namespace_name'],$kubernetes['pod_name'],$kubernetes['container_name']
+                Auto_Kubernetes_Labels On
 
         tolerations:
           - operator: Exists
