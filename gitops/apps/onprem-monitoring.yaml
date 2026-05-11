@@ -1,23 +1,52 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: onprem-node-exporter
+  name: onprem-monitoring
   namespace: argocd
 spec:
   project: default
   source:
     repoURL: https://prometheus-community.github.io/helm-charts
-    chart: prometheus-node-exporter
-    targetRevision: "4.39.0"
+    chart: kube-prometheus-stack
+    targetRevision: "65.1.1"
     helm:
       values: |
-        hostRootFsMount:
+        # k3s does not expose scheduler/controller-manager/etcd metrics
+        # on the standard ports kube-prometheus-stack expects
+        kubeScheduler:
+          enabled: false
+        kubeControllerManager:
+          enabled: false
+        kubeEtcd:
+          enabled: false
+        kubeProxy:
+          enabled: false
+
+        # Centralised Grafana and Alertmanager live on EKS
+        grafana:
+          enabled: false
+        alertmanager:
+          enabled: false
+
+        prometheus:
+          prometheusSpec:
+            retention: 15d
+            externalLabels:
+              cluster: omen-onprem
+            thanos:
+              objectStorageConfig:
+                secret:
+                  type: S3
+                  config:
+                    bucket: acme-staging-thanos-516341735012
+                    endpoint: s3.af-south-1.amazonaws.com
+                    region: af-south-1
+                    # On-prem uses IAM credentials — no IRSA available outside AWS
+                    access_key: ""
+                    secret_key: ""
+
+        nodeExporter:
           enabled: true
-        service:
-          port: 9100
-          targetPort: 9100
-        tolerations:
-          - operator: Exists
   destination:
     server: https://100.120.215.34:6443
     namespace: monitoring
@@ -27,3 +56,4 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+      - ServerSideApply=true
