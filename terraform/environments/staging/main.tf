@@ -82,5 +82,8 @@ module "eks" {
   node_group_subnet_ids = module.vpc.private_subnets
   app_bucket_name       = aws_s3_bucket.app_data.bucket
 
+  endpoint_public_access = var.endpoint_public_access
+  public_access_cidrs    = var.public_access_cidrs
+
   tags = local.common_tags
 }

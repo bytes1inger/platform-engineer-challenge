@@ -51,3 +51,15 @@ variable "app_bucket_suffix" {
   type        = string
   default     = "app-data"
 }
+
+variable "endpoint_public_access" {
+  description = "Enable public access to the EKS API server — restrict public_access_cidrs to known IPs"
+  type        = bool
+  default     = false
+}
+
+variable "public_access_cidrs" {
+  description = "CIDR blocks allowed to reach the public API endpoint"
+  type        = list(string)
+  default     = []
+}

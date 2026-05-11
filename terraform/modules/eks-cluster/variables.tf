@@ -34,6 +34,18 @@ variable "app_bucket_name" {
   default     = ""
 }
 
+variable "endpoint_public_access" {
+  description = "Enable public access to the EKS API server"
+  type        = bool
+  default     = false
+}
+
+variable "public_access_cidrs" {
+  description = "CIDR blocks allowed to reach the public API endpoint — restrict to known IPs"
+  type        = list(string)
+  default     = []
+}
+
 variable "tags" {
   description = "Tags to apply to all resources"
   type        = map(string)
