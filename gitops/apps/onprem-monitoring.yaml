@@ -42,7 +42,7 @@ spec:
         nodeExporter:
           enabled: true
   destination:
-    server: https://100.120.215.34:6443
+    server: https://omen.tailf91091.ts.net
     namespace: monitoring
   syncPolicy:
     automated:

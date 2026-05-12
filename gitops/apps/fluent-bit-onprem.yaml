@@ -64,7 +64,7 @@ spec:
             cpu: 200m
             memory: 200Mi
   destination:
-    server: https://100.120.215.34:6443
+    server: https://omen.tailf91091.ts.net
     namespace: logging
   syncPolicy:
     automated:

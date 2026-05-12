@@ -9,7 +9,7 @@ resources:
 images:
   - name: sample-app
     newName: 516341735012.dkr.ecr.af-south-1.amazonaws.com/acme/api-service
-    newTag: latest
+    newTag: 6f935928f93cb951b6630a78d3aeebdd4814ff4d
 
 configMapGenerator:
   - name: sample-app-config
@@ -23,6 +23,10 @@ patches:
       - op: replace
         path: /metadata/labels/cluster
         value: onprem
+      - op: add
+        path: /spec/template/spec/imagePullSecrets
+        value:
+          - name: ecr-pull
     target:
       kind: Deployment
       name: sample-app
