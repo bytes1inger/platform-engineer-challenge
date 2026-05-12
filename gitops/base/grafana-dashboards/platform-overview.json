@@ -1,0 +1,290 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [],
+  "panels": [
+    {
+      "gridPos": { "h": 3, "w": 24, "x": 0, "y": 0 },
+      "id": 100,
+      "options": {
+        "code": { "language": "plaintext" },
+        "content": "# Palladium Platform Overview\nMulti-cluster metrics aggregated via **Thanos Query** from EKS (af-south-1) and k3s (on-prem/WSL2). Data sources: Prometheus sidecars uploading to S3, queried through a single Thanos endpoint.",
+        "mode": "markdown"
+      },
+      "type": "text",
+      "transparent": true
+    },
+    {
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 3 },
+      "id": 1,
+      "title": "Clusters",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [{ "color": "green", "value": null }] }
+        }
+      },
+      "targets": [{
+        "expr": "count(count by (cluster) (up))",
+        "legendFormat": "clusters"
+      }]
+    },
+    {
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 3 },
+      "id": 2,
+      "title": "Total Pods",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [{ "color": "green", "value": null }] }
+        }
+      },
+      "targets": [{
+        "expr": "count(kube_pod_info)",
+        "legendFormat": "pods"
+      }]
+    },
+    {
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 3 },
+      "id": 3,
+      "title": "Running Containers",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [{ "color": "green", "value": null }] }
+        }
+      },
+      "targets": [{
+        "expr": "count(kube_pod_container_status_running == 1)",
+        "legendFormat": "containers"
+      }]
+    },
+    {
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 3 },
+      "id": 4,
+      "title": "Targets Up",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [
+            { "color": "red", "value": null },
+            { "color": "green", "value": 1 }
+          ] }
+        }
+      },
+      "targets": [{
+        "expr": "sum(up)",
+        "legendFormat": "up"
+      }]
+    },
+    {
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 3 },
+      "id": 5,
+      "title": "Nodes (EKS)",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [{ "color": "blue", "value": null }] }
+        }
+      },
+      "targets": [{
+        "expr": "count(kube_node_info{cluster=\"eks-af-south-1\"})",
+        "legendFormat": "nodes"
+      }]
+    },
+    {
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 3 },
+      "id": 6,
+      "title": "Nodes (On-Prem)",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [{ "color": "green", "value": null }] }
+        }
+      },
+      "targets": [{
+        "expr": "count(kube_node_info{cluster=\"omen-onprem\"})",
+        "legendFormat": "nodes"
+      }]
+    },
+    {
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 7 },
+      "id": 10,
+      "title": "Pods per Cluster",
+      "type": "piechart",
+      "datasource": { "type": "prometheus", "uid": "" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "right" },
+        "pieType": "donut",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      },
+      "targets": [{
+        "expr": "count by (cluster) (kube_pod_info)",
+        "legendFormat": "{{cluster}}"
+      }]
+    },
+    {
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 7 },
+      "id": 11,
+      "title": "Pods by Namespace (all clusters)",
+      "type": "bargauge",
+      "datasource": { "type": "prometheus", "uid": "" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "thresholds": { "steps": [{ "color": "green", "value": null }] }
+        }
+      },
+      "options": {
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      },
+      "targets": [{
+        "expr": "count by (namespace) (kube_pod_info)",
+        "legendFormat": "{{namespace}}"
+      }]
+    },
+    {
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 15 },
+      "id": 20,
+      "title": "CPU Usage by Cluster",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "fillOpacity": 20, "lineWidth": 2 }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      },
+      "targets": [{
+        "expr": "sum by (cluster) (rate(container_cpu_usage_seconds_total{container!=\"\"}[5m]))",
+        "legendFormat": "{{cluster}}"
+      }]
+    },
+    {
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 15 },
+      "id": 21,
+      "title": "Memory Usage by Cluster",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": { "fillOpacity": 20, "lineWidth": 2 }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      },
+      "targets": [{
+        "expr": "sum by (cluster) (container_memory_working_set_bytes{container!=\"\"})",
+        "legendFormat": "{{cluster}}"
+      }]
+    },
+    {
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 23 },
+      "id": 30,
+      "title": "Sample App — CPU (by cluster)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "fillOpacity": 15, "lineWidth": 2 }
+        }
+      },
+      "targets": [{
+        "expr": "sum by (cluster, pod) (rate(container_cpu_usage_seconds_total{namespace=\"apps\", container=\"sample-app\"}[5m]))",
+        "legendFormat": "{{cluster}} / {{pod}}"
+      }]
+    },
+    {
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 23 },
+      "id": 31,
+      "title": "Sample App — Memory (by cluster)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": { "fillOpacity": 15, "lineWidth": 2 }
+        }
+      },
+      "targets": [{
+        "expr": "sum by (cluster, pod) (container_memory_working_set_bytes{namespace=\"apps\", container=\"sample-app\"})",
+        "legendFormat": "{{cluster}} / {{pod}}"
+      }]
+    },
+    {
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 31 },
+      "id": 40,
+      "title": "Network Receive — by Namespace",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps",
+          "custom": { "fillOpacity": 15, "lineWidth": 2, "stacking": { "mode": "normal" } }
+        }
+      },
+      "targets": [{
+        "expr": "sum by (namespace) (rate(container_network_receive_bytes_total[5m]))",
+        "legendFormat": "{{namespace}}"
+      }]
+    },
+    {
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 31 },
+      "id": 41,
+      "title": "Pod Restarts (last 1h)",
+      "type": "table",
+      "datasource": { "type": "prometheus", "uid": "" },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "Value" }, "properties": [{ "id": "displayName", "value": "Restarts" }] }
+        ]
+      },
+      "options": {
+        "sortBy": [{ "desc": true, "displayName": "Restarts" }]
+      },
+      "targets": [{
+        "expr": "sort_desc(increase(kube_pod_container_status_restarts_total[1h]) > 0)",
+        "legendFormat": "{{cluster}} / {{namespace}} / {{pod}}",
+        "format": "table",
+        "instant": true
+      }]
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["palladium", "platform", "thanos", "multi-cluster"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Palladium Platform Overview",
+  "uid": "palladium-overview",
+  "version": 1
+}

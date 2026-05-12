@@ -22,7 +22,7 @@ spec:
             - query
             - --http-address=0.0.0.0:9090
             - --grpc-address=0.0.0.0:10901
-            - --endpoint=dnssrv+_grpc._tcp.kube-prometheus-stack-thanos-discovery.monitoring.svc.cluster.local
+            - --endpoint=dnssrv+_grpc._tcp.prometheus-operated.monitoring.svc.cluster.local
             - --query.replica-label=prometheus_replica
           ports:
             - name: http
