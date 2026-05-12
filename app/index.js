@@ -50,6 +50,15 @@ function page() {
     .stat { background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 0.75rem 1rem; flex: 1; min-width: 110px; }
     .stat-label { font-size: 0.65rem; color: #8b949e; text-transform: uppercase; letter-spacing: 0.08em; }
     .stat-value { font-size: 0.9rem; font-weight: 600; color: #3fb950; margin-top: 0.2rem; }
+    .tools { margin-top: 2rem; }
+    .tools-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem; margin-bottom: 1.25rem; }
+    .tool-link { display: block; background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 1rem; text-decoration: none; transition: border-color 0.15s, background 0.15s; }
+    .tool-link:hover { border-color: ${accent}; background: #1c2128; }
+    .tool-name { font-size: 0.9rem; font-weight: 600; color: #e6edf3; }
+    .tool-desc { font-size: 0.7rem; color: #8b949e; margin-top: 0.25rem; }
+    .creds { background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 1rem 1.25rem; display: flex; gap: 2rem; align-items: center; flex-wrap: wrap; }
+    .creds-label { font-size: 0.7rem; color: #8b949e; text-transform: uppercase; letter-spacing: 0.08em; }
+    .creds-value { font-family: 'SFMono-Regular', Consolas, monospace; font-size: 0.85rem; color: ${accent}; margin-top: 0.15rem; }
   </style>
 </head>
 <body>
@@ -87,6 +96,32 @@ function page() {
       <div class="stat"><div class="stat-label">Self-heal</div><div class="stat-value">Enabled</div></div>
       <div class="stat"><div class="stat-label">Metrics</div><div class="stat-value">Prometheus</div></div>
       <div class="stat"><div class="stat-label">Logs</div><div class="stat-value">Loki</div></div>
+    </div>
+    <div class="tools">
+      <div class="section-label">Platform tools</div>
+      <div class="tools-grid">
+        <a class="tool-link" href="https://grafana-demo.gideonwarui.com" target="_blank">
+          <div class="tool-name">Grafana</div>
+          <div class="tool-desc">Dashboards &amp; visualization</div>
+        </a>
+        <a class="tool-link" href="https://argocd-demo.gideonwarui.com" target="_blank">
+          <div class="tool-name">ArgoCD</div>
+          <div class="tool-desc">GitOps deployments</div>
+        </a>
+        <a class="tool-link" href="https://prometheus-demo.gideonwarui.com" target="_blank">
+          <div class="tool-name">Prometheus</div>
+          <div class="tool-desc">Metrics &amp; Thanos Query</div>
+        </a>
+        <a class="tool-link" href="https://alertmanager-demo.gideonwarui.com" target="_blank">
+          <div class="tool-name">Alertmanager</div>
+          <div class="tool-desc">Alert routing &amp; silencing</div>
+        </a>
+      </div>
+      <div class="creds">
+        <div><div class="creds-label">Username</div><div class="creds-value">demo</div></div>
+        <div><div class="creds-label">Password</div><div class="creds-value">palladium</div></div>
+        <div><div class="creds-label">Applies to</div><div class="creds-value">Grafana &amp; ArgoCD</div></div>
+      </div>
     </div>
   </div>
 </body>
