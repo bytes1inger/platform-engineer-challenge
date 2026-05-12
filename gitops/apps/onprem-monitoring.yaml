@@ -40,7 +40,7 @@ spec:
                   key: objstore.yml
 
         nodeExporter:
-          enabled: true
+          enabled: false
   destination:
     server: https://omen.tailf91091.ts.net
     namespace: monitoring
