@@ -19,9 +19,12 @@ spec:
         runAsUser: 1000
       containers:
         - name: app
-          image: nginxinc/nginx-unprivileged:1.27-alpine
+          image: sample-app:latest
           ports:
             - containerPort: 8080
+          env:
+            - name: PORT
+              value: "8080"
           envFrom:
             - configMapRef:
                 name: sample-app-config
@@ -39,33 +42,19 @@ spec:
               memory: 128Mi
           readinessProbe:
             httpGet:
-              path: /
+              path: /health
               port: 8080
             initialDelaySeconds: 5
             periodSeconds: 10
           livenessProbe:
             httpGet:
-              path: /
+              path: /health
               port: 8080
             initialDelaySeconds: 15
             periodSeconds: 20
           volumeMounts:
             - name: tmp
               mountPath: /tmp
-            - name: cache
-              mountPath: /var/cache/nginx
-            - name: run
-              mountPath: /var/run
-            - name: html
-              mountPath: /usr/share/nginx/html/index.html
-              subPath: index.html
       volumes:
         - name: tmp
           emptyDir: {}
-        - name: cache
-          emptyDir: {}
-        - name: run
-          emptyDir: {}
-        - name: html
-          configMap:
-            name: sample-app-html

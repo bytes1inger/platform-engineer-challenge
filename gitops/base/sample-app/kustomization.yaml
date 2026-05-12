@@ -5,5 +5,4 @@ resources:
   - deployment.yaml
   - service.yaml
   - configmap.yaml
-  - html-configmap.yaml
   - networkpolicy.yaml

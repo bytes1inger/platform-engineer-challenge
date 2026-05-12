@@ -1,0 +1,89 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [master]
+
+env:
+  AWS_REGION: af-south-1
+  ECR_REPOSITORY: acme/api-service
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: write
+      pull-requests: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Derive ECR registry URL
+        id: ecr-registry
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "registry=${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com" >> $GITHUB_OUTPUT
+
+      - name: Login to Amazon ECR
+        env:
+          REGISTRY: ${{ steps.ecr-registry.outputs.registry }}
+        run: |
+          aws ecr get-login-password --region "$AWS_REGION" | \
+            docker login --username AWS --password-stdin "$REGISTRY"
+
+      - name: Set image URI
+        env:
+          REGISTRY: ${{ steps.ecr-registry.outputs.registry }}
+          SHA: ${{ github.sha }}
+        run: |
+          echo "IMAGE_URI=${REGISTRY}/${ECR_REPOSITORY}:${SHA}" >> $GITHUB_ENV
+
+      - name: Run tests
+        run: npm test
+        working-directory: app
+
+      - name: Build Docker image
+        env:
+          SHA: ${{ github.sha }}
+        run: docker build --build-arg BUILD_SHA="$SHA" -t "$IMAGE_URI" .
+
+      - name: Scan image for vulnerabilities
+        uses: aquasecurity/trivy-action@0.30.0
+        with:
+          image-ref: ${{ env.IMAGE_URI }}
+          format: table
+          severity: CRITICAL
+          exit-code: 1
+          ignore-unfixed: true
+
+      - name: Push image to ECR
+        if: github.ref == 'refs/heads/platform-demo' && github.event_name == 'push'
+        run: docker push "$IMAGE_URI"
+
+      - name: Update cloud overlay image tag
+        if: github.ref == 'refs/heads/platform-demo' && github.event_name == 'push'
+        env:
+          SHA: ${{ github.sha }}
+        run: |
+          curl -sL "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.7.1/kustomize_v5.7.1_linux_amd64.tar.gz" \
+            | tar xz -C /tmp && sudo mv /tmp/kustomize /usr/local/bin/
+          cd gitops/overlays/cloud
+          kustomize edit set image "sample-app=${IMAGE_URI}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add kustomization.yaml
+          git commit -m "chore: deploy ${SHA} to cloud [skip ci]"
+          git push

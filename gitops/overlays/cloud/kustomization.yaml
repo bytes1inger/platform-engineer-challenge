@@ -6,11 +6,17 @@ namespace: apps
 resources:
   - ../../base/sample-app
 
+images:
+  - name: sample-app
+    newName: 516341735012.dkr.ecr.af-south-1.amazonaws.com/acme/api-service
+    newTag: latest
+
 configMapGenerator:
   - name: sample-app-config
     behavior: merge
     literals:
-      - APP_ENV=cloud
+      - CLUSTER=EKS - af-south-1
+      - OVERLAY=cloud
 
 patches:
   - patch: |-
@@ -23,7 +29,3 @@ patches:
     target:
       kind: Deployment
       name: sample-app
-  - path: html-patch.yaml
-    target:
-      kind: ConfigMap
-      name: sample-app-html
