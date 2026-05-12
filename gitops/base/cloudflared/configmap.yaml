@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cloudflared-config
+  namespace: cloudflared
+data:
+  config.yaml: |
+    tunnel: 7d17a08d-6931-46a7-9b5a-1b419fb62e7d
+    credentials-file: /etc/cloudflared/creds/credentials.json
+    metrics: 0.0.0.0:2000
+    no-autoupdate: true
+
+    ingress:
+      - hostname: demo.gideonwarui.com
+        path: /grafana.*
+        service: http://kube-prometheus-stack-grafana.monitoring.svc.cluster.local:80
+      - hostname: demo.gideonwarui.com
+        path: /argocd.*
+        service: http://argocd-server.argocd.svc.cluster.local:80
+      - hostname: demo.gideonwarui.com
+        path: /prometheus.*
+        service: http://thanos-query.monitoring.svc.cluster.local:9090
+      - hostname: demo.gideonwarui.com
+        path: /alertmanager.*
+        service: http://kube-prometheus-stack-alertmanager.monitoring.svc.cluster.local:9093
+      - hostname: demo.gideonwarui.com
+        service: http://sample-app.apps.svc.cluster.local:80
+      - service: http_status:404
