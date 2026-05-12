@@ -11,17 +11,13 @@ data:
     no-autoupdate: true
 
     ingress:
-      - hostname: demo.gideonwarui.com
-        path: /grafana.*
+      - hostname: grafana-demo.gideonwarui.com
         service: http://kube-prometheus-stack-grafana.monitoring.svc.cluster.local:80
-      - hostname: demo.gideonwarui.com
-        path: /argocd.*
+      - hostname: argocd-demo.gideonwarui.com
         service: http://argocd-server.argocd.svc.cluster.local:80
-      - hostname: demo.gideonwarui.com
-        path: /prometheus.*
+      - hostname: prometheus-demo.gideonwarui.com
         service: http://thanos-query.monitoring.svc.cluster.local:9090
-      - hostname: demo.gideonwarui.com
-        path: /alertmanager.*
+      - hostname: alertmanager-demo.gideonwarui.com
         service: http://kube-prometheus-stack-alertmanager.monitoring.svc.cluster.local:9093
       - hostname: demo.gideonwarui.com
         service: http://sample-app.apps.svc.cluster.local:80
