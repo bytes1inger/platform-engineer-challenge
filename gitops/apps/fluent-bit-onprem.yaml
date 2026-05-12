@@ -4,7 +4,7 @@ metadata:
   name: fluent-bit-onprem
   namespace: argocd
 spec:
-  project: default
+  project: onprem
   source:
     repoURL: https://fluent.github.io/helm-charts
     chart: fluent-bit

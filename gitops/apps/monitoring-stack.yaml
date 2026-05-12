@@ -1,0 +1,63 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: monitoring-stack
+  namespace: argocd
+  labels:
+    tier: infrastructure
+spec:
+  project: infrastructure
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: kube-prometheus-stack
+    targetRevision: 65.1.1
+    helm:
+      releaseName: kube-prometheus-stack
+      valuesObject:
+        grafana:
+          adminUser: demo
+          adminPassword: palladium
+          additionalDataSources:
+            - name: Thanos
+              type: prometheus
+              access: proxy
+              url: http://thanos-query.monitoring.svc.cluster.local:9090
+              isDefault: true
+            - name: Loki
+              type: loki
+              access: proxy
+              url: http://loki.monitoring.svc.cluster.local:3100
+          sidecar:
+            datasources:
+              defaultDatasourceEnabled: false
+          grafana.ini:
+            server:
+              root_url: https://grafana-demo.gideonwarui.com
+              serve_from_sub_path: false
+        prometheus:
+          prometheusSpec:
+            retention: 15d
+            externalLabels:
+              cluster: eks-af-south-1
+            thanos:
+              objectStorageConfig:
+                secret:
+                  type: S3
+                  config:
+                    bucket: acme-staging-thanos-516341735012
+                    endpoint: s3.af-south-1.amazonaws.com
+                    region: af-south-1
+          serviceAccount:
+            annotations:
+              eks.amazonaws.com/role-arn: arn:aws:iam::516341735012:role/acme-staging-thanos-sidecar
+        alertmanager:
+          alertmanagerSpec:
+            routePrefix: /
+            externalUrl: https://alertmanager-demo.gideonwarui.com
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

@@ -4,7 +4,7 @@ metadata:
   name: onprem-monitoring
   namespace: argocd
 spec:
-  project: default
+  project: onprem
   source:
     repoURL: https://prometheus-community.github.io/helm-charts
     chart: kube-prometheus-stack

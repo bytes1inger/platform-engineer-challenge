@@ -4,7 +4,7 @@ metadata:
   name: fluent-bit-cloud
   namespace: argocd
 spec:
-  project: default
+  project: eks
   source:
     repoURL: https://fluent.github.io/helm-charts
     chart: fluent-bit

@@ -1,0 +1,15 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: onprem
+  namespace: argocd
+spec:
+  description: Applications on k3s on-prem cluster
+  sourceRepos:
+    - '*'
+  destinations:
+    - namespace: '*'
+      server: https://omen.tailf91091.ts.net
+  clusterResourceWhitelist:
+    - group: '*'
+      kind: '*'

@@ -4,7 +4,7 @@ metadata:
   name: sample-app-onprem
   namespace: argocd
 spec:
-  project: default
+  project: onprem
   source:
     repoURL: https://github.com/bytes1inger/platform-engineer-challenge
     targetRevision: platform-demo

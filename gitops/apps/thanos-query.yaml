@@ -1,17 +1,19 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: sample-app-cloud
+  name: thanos-query
   namespace: argocd
+  labels:
+    tier: infrastructure
 spec:
-  project: eks
+  project: infrastructure
   source:
     repoURL: https://github.com/bytes1inger/platform-engineer-challenge
     targetRevision: platform-demo
-    path: gitops/overlays/cloud
+    path: gitops/base/thanos-query
   destination:
-    server: https://kubernetes.default.svc   # in-cluster (EKS)
-    namespace: apps
+    server: https://kubernetes.default.svc
+    namespace: monitoring
   syncPolicy:
     automated:
       prune: true

@@ -1,17 +1,19 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: sample-app-cloud
+  name: cloudflared
   namespace: argocd
+  labels:
+    tier: infrastructure
 spec:
-  project: eks
+  project: infrastructure
   source:
     repoURL: https://github.com/bytes1inger/platform-engineer-challenge
     targetRevision: platform-demo
-    path: gitops/overlays/cloud
+    path: gitops/base/cloudflared
   destination:
-    server: https://kubernetes.default.svc   # in-cluster (EKS)
-    namespace: apps
+    server: https://kubernetes.default.svc
+    namespace: cloudflared
   syncPolicy:
     automated:
       prune: true
