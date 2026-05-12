@@ -9,7 +9,7 @@ resources:
 images:
 - name: sample-app
   newName: 516341735012.dkr.ecr.af-south-1.amazonaws.com/acme/api-service
-  newTag: 0a4d01085dcdf35f7f14abc4252ac039015ba3cf
+  newTag: 8253051ef5dcd03f6ce85426ceeb246889359074
 
 configMapGenerator:
 - behavior: merge
