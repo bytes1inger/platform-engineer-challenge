@@ -4,28 +4,28 @@ kind: Kustomization
 namespace: apps
 
 resources:
-  - ../../base/sample-app
+- ../../base/sample-app
 
 images:
-  - name: sample-app
-    newName: 516341735012.dkr.ecr.af-south-1.amazonaws.com/acme/api-service
-    newTag: latest
+- name: sample-app
+  newName: 516341735012.dkr.ecr.af-south-1.amazonaws.com/acme/api-service
+  newTag: 6f935928f93cb951b6630a78d3aeebdd4814ff4d
 
 configMapGenerator:
-  - name: sample-app-config
-    behavior: merge
-    literals:
-      - CLUSTER=EKS - af-south-1
-      - OVERLAY=cloud
+- behavior: merge
+  literals:
+  - CLUSTER=EKS - af-south-1
+  - OVERLAY=cloud
+  name: sample-app-config
 
 patches:
-  - patch: |-
-      - op: replace
-        path: /spec/replicas
-        value: 2
-      - op: replace
-        path: /metadata/labels/cluster
-        value: cloud
-    target:
-      kind: Deployment
-      name: sample-app
+- patch: |-
+    - op: replace
+      path: /spec/replicas
+      value: 2
+    - op: replace
+      path: /metadata/labels/cluster
+      value: cloud
+  target:
+    kind: Deployment
+    name: sample-app
