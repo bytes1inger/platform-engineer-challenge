@@ -56,6 +56,9 @@ spec:
               mountPath: /var/cache/nginx
             - name: run
               mountPath: /var/run
+            - name: html
+              mountPath: /usr/share/nginx/html/index.html
+              subPath: index.html
       volumes:
         - name: tmp
           emptyDir: {}
@@ -63,3 +66,6 @@ spec:
           emptyDir: {}
         - name: run
           emptyDir: {}
+        - name: html
+          configMap:
+            name: sample-app-html

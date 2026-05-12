@@ -10,7 +10,7 @@ spec:
     targetRevision: platform-demo
     path: gitops/overlays/onprem
   destination:
-    server: https://kubernetes.default.svc   # in-cluster (k3s on Omen)
+    server: https://100.120.215.34:6443
     namespace: apps
   syncPolicy:
     automated:

@@ -20,3 +20,7 @@ patches:
     target:
       kind: Deployment
       name: sample-app
+  - path: html-patch.yaml
+    target:
+      kind: ConfigMap
+      name: sample-app-html

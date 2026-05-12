@@ -35,15 +35,9 @@ spec:
               cluster: omen-onprem
             thanos:
               objectStorageConfig:
-                secret:
-                  type: S3
-                  config:
-                    bucket: acme-staging-thanos-516341735012
-                    endpoint: s3.af-south-1.amazonaws.com
-                    region: af-south-1
-                    # On-prem uses IAM credentials — no IRSA available outside AWS
-                    access_key: ""
-                    secret_key: ""
+                existingSecret:
+                  name: thanos-objstore
+                  key: objstore.yml
 
         nodeExporter:
           enabled: true
