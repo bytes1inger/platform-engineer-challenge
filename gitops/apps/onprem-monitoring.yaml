@@ -33,6 +33,13 @@ spec:
             retention: 15d
             externalLabels:
               cluster: omen-onprem
+            storageSpec:
+              volumeClaimTemplate:
+                spec:
+                  accessModes: ["ReadWriteOnce"]
+                  resources:
+                    requests:
+                      storage: 5Gi
             thanos:
               objectStorageConfig:
                 existingSecret:
