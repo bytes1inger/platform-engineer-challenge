@@ -1,0 +1,82 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: thanos-store
+  namespace: monitoring
+  labels:
+    app: thanos-store
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: thanos-store
+  template:
+    metadata:
+      labels:
+        app: thanos-store
+    spec:
+      serviceAccountName: kube-prometheus-stack-prometheus
+      containers:
+        - name: thanos-store
+          image: quay.io/thanos/thanos:v0.39.2
+          args:
+            - store
+            - --data-dir=/var/thanos/store
+            - --objstore.config=$(OBJSTORE_CONFIG)
+            - --grpc-address=0.0.0.0:10901
+            - --http-address=0.0.0.0:10902
+          env:
+            - name: OBJSTORE_CONFIG
+              value: |
+                type: S3
+                config:
+                  bucket: acme-staging-thanos-516341735012
+                  endpoint: s3.af-south-1.amazonaws.com
+                  region: af-south-1
+          ports:
+            - name: grpc
+              containerPort: 10901
+            - name: http
+              containerPort: 10902
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          volumeMounts:
+            - name: data
+              mountPath: /var/thanos/store
+          livenessProbe:
+            httpGet:
+              path: /-/healthy
+              port: http
+            initialDelaySeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /-/ready
+              port: http
+            initialDelaySeconds: 10
+      volumes:
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: thanos-store
+  namespace: monitoring
+  labels:
+    app: thanos-store
+spec:
+  type: ClusterIP
+  ports:
+    - name: grpc
+      port: 10901
+      targetPort: 10901
+    - name: http
+      port: 10902
+      targetPort: 10902
+  selector:
+    app: thanos-store
