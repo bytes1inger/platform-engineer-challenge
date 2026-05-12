@@ -35,3 +35,8 @@ Thumbs.db
 
 # Rubric — candidates should not see this
 docs/RUBRIC-INTERNAL.md
+
+# Personal interview notes — not for sharing
+docs/DEMO-WALKTHROUGH.md
+docs/DEMO-CHEATSHEET.md
+docs/CHALLENGE-SOLUTION-QA.md
